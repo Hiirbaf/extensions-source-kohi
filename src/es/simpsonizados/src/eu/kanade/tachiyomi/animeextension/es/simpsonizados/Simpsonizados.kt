@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.extension.es.simpsonizados
+package eu.kanade.tachiyomi.animeextension.es.simpsonizados
 
 import eu.kanade.tachiyomi.multisrc.dooplay.Dooplay
 

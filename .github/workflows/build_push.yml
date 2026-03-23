@@ -180,10 +180,23 @@ jobs:
       - name: Checkout repo branch
         uses: actions/checkout@v4 # v4
         with:
-          repository: hiirbaf/extensions-source-kohi  #just to initialize the folder
-          token: ${{ secrets.TOKEN_GITHUB }}
+          repository: hiirbaf/extensions-source-kohi  # repo externo privado
           ref: main
           path: repo
+          token: ${{ secrets.BOT_PAT }}              # <- usar un PAT válido que tengas en Secrets
+          ssh-strict: true
+          ssh-user: git
+          persist-credentials: true
+          clean: true
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+          fetch-tags: false
+          show-progress: true
+          lfs: false
+          submodules: false
+          set-safe-directory: true
+        env:
+          CI_CHUNK_SIZE: 288
 
       - name: Set Forgejo remote URL
         run: |

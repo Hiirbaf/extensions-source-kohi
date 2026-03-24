@@ -28,7 +28,7 @@ class Simpsonizados : Dooplay(
     // Nombre del episodio
     override val episodeNameSelector = "div.episodiotitle > a"
 
-    // Fecha (opcional)
+    // Fecha
     override val episodeDateSelector = "span.date"
 
     // Los videos se obtienen vía la API de Dooplay

@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - '**'  # cualquier rama
     paths:
       - '**'
       - '!**.md'
@@ -26,39 +26,28 @@ jobs:
     outputs:
       individualMatrix: ${{ steps.generate-matrices.outputs.individualMatrix }}
     steps:
-      - name: Clone repo
-        uses: actions/checkout@v4 # v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
         with:
-          ref: main
+          fetch-depth: 2
           token: ${{ secrets.TOKEN_GITHUB }}
 
       - name: Get last modified extension
         id: last-mod
-        uses: tj-actions/changed-files@v46.0.5
-        with:
-          files: src/**           # detecta cambios en extensiones
-          files_ignore: '**/*.md'
-
-      - name: Extract last changed module
-        id: last-module
         run: |
-          files=(${{ steps.last-mod.outputs.all_changed_files }})
-          if [ ${#files[@]} -eq 0 ]; then
+          files=$(git diff --name-only HEAD~1 HEAD | grep '^src/')
+          if [ -z "$files" ]; then
             echo "No changed modules"
             echo "LAST_MODULE="
             exit 0
           fi
-
-          # Tomamos el primer archivo modificado
-          first_file=${files[0]}
-          # Extraemos la carpeta principal de la extensión, ej: src/es/simpsonizados -> es/simpsonizados
+          first_file=$(echo "$files" | head -n1)
           module=$(echo $first_file | cut -d/ -f2,3)
-
           echo "LAST_MODULE=$module" >> "$GITHUB_ENV"
           echo "Last modified module: $module"
 
       - id: generate-matrices
-        name: Create output matrices
+        name: Create output matrix
         uses: actions/github-script@v7
         with:
           script: |
@@ -71,10 +60,10 @@ jobs:
     strategy:
       matrix: ${{ fromJSON(needs.prepare.outputs.individualMatrix) }}
     steps:
-      - name: Checkout main branch
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          ref: main
+          fetch-depth: 2
           token: ${{ secrets.TOKEN_GITHUB }}
 
       - name: Set up JDK
@@ -82,10 +71,6 @@ jobs:
         with:
           java-version: 17
           distribution: temurin
-
-      - name: Prepare signing key
-        run: |
-          echo ${{ secrets.SIGNING_KEY }} | base64 -d > signingkey.jks
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -158,7 +143,7 @@ jobs:
       - name: Checkout main branch
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.ref_name }}  # funciona en cualquier rama
           path: main
           token: ${{ secrets.TOKEN_GITHUB }}
 
@@ -176,7 +161,7 @@ jobs:
         with:
           repository: hiirbaf/extensions-source-kohi
           token: ${{ secrets.TOKEN_GITHUB }}
-          ref: main
+          ref: ${{ github.ref_name }}  # publica en la misma rama
           path: repo
 
       - name: Set Forgejo remote URL
@@ -187,7 +172,7 @@ jobs:
       - name: Pull latest changes
         run: |
           cd repo
-          git pull --rebase origin main
+          git pull --rebase origin ${{ github.ref_name }}
 
       - name: Sync repo
         run: |

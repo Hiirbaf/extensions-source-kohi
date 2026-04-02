@@ -97,6 +97,7 @@ class Pandrama : ConfigurableAnimeSource, AnimeHttpSource() {
 
     override fun latestUpdatesRequest(page: Int) = GET("$baseUrl/explorar/Dramas--hits------$page---/", headers)
 
+    // c
     override fun latestUpdatesParse(response: Response) = popularAnimeParse(response)
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {

@@ -1,16 +1,12 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '**'
-      - '!**.md'
-      - '!.github/**'
-      - '.github/scripts/**'
-      - '.github/workflows/build_push.yml'
   workflow_dispatch:
+    inputs:
+      reference_branch:
+        description: 'Branch to compare changes against'
+        default: 'develop'
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}
@@ -23,17 +19,19 @@ jobs:
     outputs:
       modifiedModules: ${{ steps.detect-modules.outputs.modifiedModules }}
     steps:
-      - name: Checkout main branch
+      - name: Checkout current branch
         uses: actions/checkout@v4
         with:
-          ref: main
           token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0  # necesitamos todo el historial para git diff
 
       - name: Detect modified modules
         id: detect-modules
         run: |
-          echo "Detecting modified extensions in last commit..."
-          MODIFIED=$(git diff --name-only HEAD~1 HEAD | grep '^src/' || true)
+          REF_BRANCH="${{ github.event.inputs.reference_branch }}"
+          echo "Comparing $(git rev-parse HEAD) with $REF_BRANCH..."
+          git fetch origin $REF_BRANCH --depth=1
+          MODIFIED=$(git diff --name-only origin/$REF_BRANCH HEAD | grep '^src/' || true)
           MODULES=$(echo "$MODIFIED" | cut -d'/' -f1,2 | sort -u | tr '\n' ' ')
           echo "Modified modules: $MODULES"
           echo "modifiedModules=$MODULES" >> $GITHUB_OUTPUT
@@ -44,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ needs.prepare.outputs.modifiedModules != '' }}
     steps:
-      - name: Checkout main branch
+      - name: Checkout current branch
         uses: actions/checkout@v4
         with:
-          ref: main
           token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -92,7 +90,6 @@ jobs:
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
-        if: ${{ github.repository == 'hiirbaf/extensions-source-kohi' }}
         with:
           name: "modified-apks"
           path: "**/*.apk"
@@ -121,12 +118,12 @@ jobs:
           java-version: 17
           distribution: temurin
 
-      - name: Checkout main branch
+      - name: Checkout current branch
         uses: actions/checkout@v4
         with:
-          ref: main
-          path: main
           token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0
+          path: main
 
       - name: Create repo artifacts
         run: |

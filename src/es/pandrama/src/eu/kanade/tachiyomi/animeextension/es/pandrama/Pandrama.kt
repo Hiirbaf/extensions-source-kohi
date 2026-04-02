@@ -84,7 +84,7 @@ class Pandrama : ConfigurableAnimeSource, AnimeHttpSource() {
     
         val jsonStr = scriptData.substringAfter("window.bootstrapData = ").substringBeforeLast(";")
     
-        // 2. Parsear el JSON
+        // 2. Parsear el JSON.
         val jsonData = json.decodeFromString<JsonObject>(jsonStr)
     
         // 3. Navegar hasta los títulos de Dramas/Animes

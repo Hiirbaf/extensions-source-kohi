@@ -24,48 +24,46 @@ jobs:
     name: Prepare job
     runs-on: ubuntu-latest
     outputs:
-      individualMatrix: ${{ steps.generate-matrices.outputs.individualMatrix }}
+      individualMatrix: ${{ steps.generate-matrix.outputs.individualMatrix }}
     steps:
-      - name: Clone repo
-        uses: actions/checkout@v4 # v4
+      - name: Checkout main branch
+        uses: actions/checkout@v4
         with:
           ref: main
           token: ${{ secrets.TOKEN_GITHUB }}
-          
-      - name: Get number of modules
-        run: |
-          set -x
-          projects=(src/*/*)
-          echo "NUM_INDIVIDUAL_MODULES=${#projects[@]}" >> "$GITHUB_ENV"
 
-      - name: Find lib changes
-        id: modified-libs
-        uses: tj-actions/changed-files@ed68ef82c095e0d48ec87eccea555d944a631a4c # v46.0.5
+      # Obtener el último commit exitoso de CI
+      - name: Get last successful CI commit
+        id: last-ci
+        uses: nrwl/nx-set-shas@v4.4.0
         with:
-          files: lib/
-          files_ignore: lib/**.md
-          files_separator: " "
-          safe_output: false
+          fallback-sha: HEAD~1
 
-      - name: Bump extensions that uses a modified lib
-        if: steps.modified-libs.outputs.any_changed == 'true'
+      # Detectar archivos modificados respecto a ese commit
+      - name: Detect modified modules
+        id: modified-modules
+        run: |
+          git fetch origin main --depth=1
+          MODIFIED=$(git diff --name-only ${{ steps.last-ci.outputs.base-sha }} HEAD | grep '^src/' || true)
+          echo "modified=$MODIFIED" >> $GITHUB_OUTPUT
+
+      # Bump versions para libs modificadas
+      - name: Bump extensions that use modified libs
+        if: steps.modified-modules.outputs.modified != ''
         run: |
           chmod +x ./.github/scripts/bump-versions.py
-          ./.github/scripts/bump-versions.py ${{ steps.modified-libs.outputs.all_changed_files }}
-      
-      - id: generate-matrices
-        name: Create output matrices
-        uses: actions/github-script@v7 # v7
+          ./.github/scripts/bump-versions.py ${{ steps.modified-modules.outputs.modified }}
+
+      # Crear matriz de builds solo para los módulos modificados
+      - id: generate-matrix
+        name: Create matrix for modified modules
+        uses: actions/github-script@v7
         with:
           script: |
-            const numIndividualModules = process.env.NUM_INDIVIDUAL_MODULES;
-            const chunkSize = process.env.CI_CHUNK_SIZE;
-
-            const numIndividualChunks = 1;
-
-            console.log(`Individual modules: ${numIndividualModules} (${numIndividualChunks} chunks of ${chunkSize})`);
-
-            core.setOutput('individualMatrix', JSON.stringify({ 'chunk': [...Array(numIndividualChunks).keys()] }));
+            const changedFiles = process.env.modified?.split("\n").filter(f => f) || [];
+            const modules = [...new Set(changedFiles.map(f => f.split("/").slice(0,2).join("/")))];
+            console.log(`Modules to build: ${modules}`);
+            core.setOutput('individualMatrix', JSON.stringify({ module: modules }));
 
   build_individual:
     name: Build individual modules
@@ -75,13 +73,13 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.individualMatrix) }}
     steps:
       - name: Checkout main branch
-        uses: actions/checkout@v4 # v4
+        uses: actions/checkout@v4
         with:
           ref: main
           token: ${{ secrets.TOKEN_GITHUB }}
 
       - name: Set up JDK
-        uses: actions/setup-java@v4 # v4
+        uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: temurin
@@ -91,7 +89,7 @@ jobs:
           echo ${{ secrets.SIGNING_KEY }} | base64 -d > signingkey.jks
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4 # v4
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Restore build cache
         uses: actions/cache/restore@v3
@@ -99,18 +97,18 @@ jobs:
           path: |
             src/**/build
             !src/**/build/outputs
-          key: build-cache-${{ github.sha }}-${{ matrix.chunk }}
+          key: build-cache-${{ github.sha }}-${{ matrix.module }}
           restore-keys: |
             build-cache-${{ github.sha }}-
             build-cache-
 
-      - name: Build extensions
+      - name: Build extension
+        run: chmod +x ./gradlew && ./gradlew -p ${{ matrix.module }} assembleRelease
         env:
-          CI_CHUNK_NUM: ${{ matrix.chunk }}
+          CI_CHUNK_NUM: ${{ matrix.module }}
           ALIAS: ${{ secrets.ALIAS }}
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: chmod +x ./gradlew && ./gradlew -p src assembleRelease
 
       - name: Store build cache
         uses: actions/cache/save@v3
@@ -118,13 +116,13 @@ jobs:
           path: |
             src/**/build
             !src/**/build/outputs
-          key: build-cache-${{ github.sha }}-${{ matrix.chunk }}
+          key: build-cache-${{ github.sha }}-${{ matrix.module }}
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         if: ${{ github.repository == 'hiirbaf/extensions-source-kohi' }}
         with:
-          name: "individual-apks-${{ matrix.chunk }}"
+          name: "individual-apks-${{ matrix.module }}"
           path: "**/*.apk"
           retention-days: 1
 
@@ -133,33 +131,32 @@ jobs:
 
   publish_repo:
     name: Publish repo
-    needs:
-      - build_individual
+    needs: build_individual
     if: ${{ github.repository == 'hiirbaf/extensions-source-kohi' }}
     runs-on: ubuntu-latest
     steps:
       - name: Setup rsync
         run: |
           sudo apt-get update && sudo apt install rsync -y
-      
+
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
         with:
           path: ~/apk-artifacts
-          
+
       - name: Set up JDK
-        uses: actions/setup-java@v4 # v4
+        uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: temurin
-                
+
       - name: Checkout main branch
-        uses: actions/checkout@v4 # v4
+        uses: actions/checkout@v4
         with:
           ref: main
           path: main
           token: ${{ secrets.TOKEN_GITHUB }}
-          
+
       - name: Create repo artifacts
         run: |
           cd main
@@ -170,9 +167,9 @@ jobs:
           python ./.github/scripts/create-repo.py    
 
       - name: Checkout repo branch
-        uses: actions/checkout@v4 # v4
+        uses: actions/checkout@v4
         with:
-          repository: hiirbaf/extensions-source-kohi  #just to initialize the folder
+          repository: hiirbaf/extensions-source-kohi
           token: ${{ secrets.TOKEN_GITHUB }}
           ref: main
           path: repo
@@ -192,8 +189,7 @@ jobs:
           rsync -a --delete --exclude .git --exclude .gitignore main/repo/ repo --exclude README.md --exclude repo.json
 
       - name: Increase buffer size
-        run: |
-          git config --global http.postBuffer 157286400
+        run: git config --global http.postBuffer 157286400
 
       - name: Deploy repo
         uses: EndBug/add-and-commit@v9

@@ -34,7 +34,7 @@ class Pandrama : ConfigurableAnimeSource, AnimeHttpSource() {
 
     override val name = "Pandrama"
 
-    override val baseUrl = "https://pandrama.com"
+    override val baseUrl = "https://pandrama.tv"
 
     override val lang = "es"
 
@@ -77,27 +77,49 @@ class Pandrama : ConfigurableAnimeSource, AnimeHttpSource() {
 
     override fun popularAnimeParse(response: Response): AnimesPage {
         val document = response.asJsoup()
-        val elements = document.select("a.public-list-exp")
-        val nextPage = document.select("[title=\"Página siguiente\"]").any()
-        val animeList = elements.map { element ->
-            val langTag = element.select(".public-prt").text().trim()
-            val prefix = when {
-                langTag.contains("Español") -> "\uD83C\uDDF2\uD83C\uDDFD "
-                langTag.contains("Castellano") -> "\uD83C\uDDEA\uD83C\uDDF8 "
-                else -> ""
+    
+        // 1. Extraer el JSON de window.bootstrapData
+        val scriptData = document.selectFirst("script:containsData(window.bootstrapData)")?.data()
+            ?: return AnimesPage(emptyList(), false)
+    
+        val jsonStr = scriptData.substringAfter("window.bootstrapData = ").substringBeforeLast(";")
+    
+        // 2. Parsear el JSON
+        val jsonData = json.decodeFromString<JsonObject>(jsonStr)
+    
+        // 3. Navegar hasta los títulos de Dramas/Animes
+        val titles = jsonData["titles"]?.jsonObject?.get("streaming_main_types") ?: JsonArray(emptyList())
+    
+        // 4. Crear lista de SAnime
+        val animeList = mutableListOf<SAnime>()
+    
+        // Dependiendo de la estructura, los títulos reales pueden estar en "titles" o en otro nodo
+        // Por ejemplo, en mi prueba se usan data["homepage"]["channels"] o data["titles"]["drama"]
+        val dramaTitles = jsonData["homepage"]?.jsonObject
+            ?.get("channels")?.jsonArray ?: JsonArray(emptyList())
+    
+        for (item in dramaTitles) {
+            val obj = item.jsonObject
+            val title = obj["label"]?.jsonPrimitive?.content ?: continue
+            val url = obj["action"]?.jsonPrimitive?.content ?: continue
+            val thumbnail = obj["image"]?.jsonPrimitive?.content // si existe
+        
+            val anime = SAnime.create().apply {
+                this.title = title
+                setUrlWithoutDomain(url)
+                thumbnail_url = thumbnail
             }
-            SAnime.create().apply {
-                title = "$prefix ${element.attr("title")}".trim()
-                thumbnail_url = element.selectFirst("img")?.attr("abs:data-src")
-                setUrlWithoutDomain(element.attr("abs:href"))
-            }
+            animeList.add(anime)
         }
+    
+        // 5. Next page
+        val nextPage = false // Si la web no tiene paginación directa en JSON
         return AnimesPage(animeList, nextPage)
     }
 
-    override fun latestUpdatesRequest(page: Int) = GET("$baseUrl/explorar/Dramas--hits------$page---/", headers)
-
     override fun latestUpdatesParse(response: Response) = popularAnimeParse(response)
+
+    override fun latestUpdatesRequest(page: Int) = GET("$baseUrl/explorar/Dramas--hits------$page---/", headers)
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
         val filterList = if (filters.isEmpty()) getFilterList() else filters

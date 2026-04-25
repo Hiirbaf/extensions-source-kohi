@@ -239,12 +239,24 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
             key = PREF_SERVER_KEY
             title = "Servidor preferido"
             entries = arrayOf(
-                "Streamtape", "Doodstream", "StreamWish",
-                "FileMoon", "VOE", "Upstream", "MixDrop", "Primero disponible",
+                "Streamtape",
+                "Doodstream",
+                "StreamWish",
+                "FileMoon",
+                "VOE",
+                "Upstream",
+                "MixDrop",
+                "Primero disponible",
             )
             entryValues = arrayOf(
-                "Streamtape", "Doodstream", "StreamWish",
-                "FileMoon", "VOE", "Upstream", "MixDrop", "Primero disponible",
+                "Streamtape",
+                "Doodstream",
+                "StreamWish",
+                "FileMoon",
+                "VOE",
+                "Upstream",
+                "MixDrop",
+                "Primero disponible",
             )
             setDefaultValue("Primero disponible")
             summary = "%s"

@@ -10,8 +10,11 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
+import eu.kanade.tachiyomi.lib.filemoonextractor.FilemoonExtractor
+import eu.kanade.tachiyomi.lib.streamwishextractor.StreamWishExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
+import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
@@ -35,6 +38,11 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
     private val preferences by lazy {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
     }
+
+    private val filemoonExtractor by lazy { FilemoonExtractor(client, headers) }
+
+    // VidHideVip usa la misma base que StreamWish
+    private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }
 
     // ==================== POPULAR ====================
 
@@ -131,9 +139,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         anime.title = document.selectFirst("h1.entry-title, h1.elementor-heading-title")
             ?.text()?.trim() ?: ""
 
-        anime.thumbnail_url = document.selectFirst(
-            "meta[property=og:image]",
-        )?.attr("content")
+        anime.thumbnail_url = document.selectFirst("meta[property=og:image]")?.attr("content")
             ?: document.selectFirst(".entry-content img, .elementor-widget-image img")
                 ?.let { it.attr("data-lazy-src").ifEmpty { it.attr("src") } }
 
@@ -150,7 +156,6 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
     }
 
     // ==================== EPISODES ====================
-    // En este tipo de sitio cada post ES la película (un solo episodio)
 
     override fun episodeListParse(response: Response): List<SEpisode> {
         val document = response.asJsoup()
@@ -181,59 +186,78 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     // ==================== VIDEO ====================
 
+    // Headers para requests a servidores externos
+    private fun refererHeaders(refererUrl: String): Headers = headers.newBuilder()
+        .set("Referer", refererUrl)
+        .build()
+
+    // Extrae m3u8 desde player.subespanolvip.com (servidor NT) por regex
+    private fun videosFromSubespanol(embedUrl: String, label: String): List<Video> =
+        runCatching {
+            val html = client.newCall(GET(embedUrl, refererHeaders(baseUrl))).execute()
+                .asJsoup().html()
+            val m3u8 = Regex("""(https?://[^"'\s]+\.m3u8[^"'\s]*)""").find(html)
+                ?.groupValues?.get(1) ?: return emptyList()
+            listOf(Video(m3u8, label, m3u8, refererHeaders(embedUrl)))
+        }.getOrElse { emptyList() }
+
     override fun videoListParse(response: Response): List<Video> {
         val document = response.asJsoup()
         val videos = mutableListOf<Video>()
 
-        // Busca las tabs de Elementor con su label (VD, FM, NT, etc.)
-        val tabs = document.select("div.elementor-tab-content")
-        tabs.forEachIndexed { index, tab ->
+        // Recolecta todos los iframes de las tabs de Elementor
+        document.select("div.elementor-tab-content").forEachIndexed { index, tab ->
             val iframe = tab.selectFirst("iframe") ?: return@forEachIndexed
             val src = iframe.attr("src").ifEmpty { iframe.attr("data-lazy-src") }
             if (src.isEmpty()) return@forEachIndexed
 
-            // El label está en el elementor-tab-title con el mismo data-tab
             val tabNumber = tab.attr("data-tab")
-            val label = document.selectFirst(
+            val tabLabel = document.selectFirst(
                 "div.elementor-tab-title[data-tab=$tabNumber]:not(.elementor-tab-mobile-title)",
             )?.text()?.trim() ?: "Servidor ${index + 1}"
 
-            val serverName = "$label · ${detectServer(src, index + 1)}"
-            videos.add(Video(src, serverName, src))
-        }
+            val extracted: List<Video> = when {
+                // VIP — m3u8 directo en el src del iframe
+                src.contains(".m3u8") -> {
+                    listOf(Video(src, tabLabel, src, refererHeaders(baseUrl)))
+                }
 
-        // Fallback: cualquier iframe en la página que no sea del propio sitio
-        if (videos.isEmpty()) {
-            document.select("iframe").forEachIndexed { index, iframe ->
-                val src = iframe.attr("src").ifEmpty { iframe.attr("data-lazy-src") }
-                if (src.startsWith("http") && baseUrl.isNotEmpty() &&
-                    !src.contains(baseUrl.removePrefix("https://").removePrefix("http://"))
-                ) {
-                    videos.add(Video(src, detectServer(src, index + 1), src))
+                // VD — VidHideVip (misma API que StreamWish)
+                "vidhidevip" in src || "vidhide" in src -> {
+                    streamwishExtractor.videosFromUrl(src, videoNameGen = { "$tabLabel - $it" })
+                }
+
+                // FM — FileMoon
+                "filemoon" in src -> {
+                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ")
+                }
+
+                // NT — player.subespanolvip.com (extracción por regex)
+                "subespanolvip" in src -> {
+                    videosFromSubespanol(src, tabLabel)
+                }
+
+                // Fallback genérico para servidores desconocidos
+                else -> {
+                    runCatching {
+                        val html = client.newCall(GET(src, refererHeaders(baseUrl))).execute()
+                            .asJsoup().html()
+                        val m3u8 = Regex("""(https?://[^"'\s]+\.m3u8[^"'\s]*)""").find(html)
+                            ?.groupValues?.get(1)
+                        if (m3u8 != null) {
+                            listOf(Video(m3u8, tabLabel, m3u8, refererHeaders(src)))
+                        } else {
+                            emptyList()
+                        }
+                    }.getOrElse { emptyList() }
                 }
             }
+
+            videos.addAll(extracted)
         }
 
         return videos.ifEmpty {
             listOf(Video("", "Sin video encontrado", ""))
-        }
-    }
-
-    private fun detectServer(url: String, index: Int): String {
-        return when {
-            "streamtape" in url -> "Streamtape"
-            "doodstream" in url || "dood." in url -> "Doodstream"
-            "streamwish" in url -> "StreamWish"
-            "filemoon" in url -> "FileMoon"
-            "vidhidevip" in url -> "VidHide"
-            "voe.sx" in url -> "VOE"
-            "upstream" in url -> "Upstream"
-            "mixdrop" in url -> "MixDrop"
-            "mp4upload" in url -> "Mp4Upload"
-            "okru" in url || "ok.ru" in url -> "OK.ru"
-            "dailymotion" in url -> "Dailymotion"
-            "youtube" in url -> "YouTube"
-            else -> "Servidor $index"
         }
     }
 
@@ -247,26 +271,8 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         ListPreference(screen.context).apply {
             key = PREF_SERVER_KEY
             title = "Servidor preferido"
-            entries = arrayOf(
-                "Streamtape",
-                "Doodstream",
-                "StreamWish",
-                "FileMoon",
-                "VOE",
-                "Upstream",
-                "MixDrop",
-                "Primero disponible",
-            )
-            entryValues = arrayOf(
-                "Streamtape",
-                "Doodstream",
-                "StreamWish",
-                "FileMoon",
-                "VOE",
-                "Upstream",
-                "MixDrop",
-                "Primero disponible",
-            )
+            entries = arrayOf("VIP", "VD", "FM", "NT", "Primero disponible")
+            entryValues = arrayOf("VIP", "VD", "FM", "NT", "Primero disponible")
             setDefaultValue("Primero disponible")
             summary = "%s"
         }.also(screen::addPreference)
@@ -275,7 +281,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
     override fun List<Video>.sort(): List<Video> {
         val preferred = preferences.getString(PREF_SERVER_KEY, "Primero disponible") ?: return this
         if (preferred == "Primero disponible") return this
-        return sortedWith(compareByDescending { it.quality.contains(preferred, ignoreCase = true) })
+        return sortedWith(compareByDescending { it.quality.startsWith(preferred, ignoreCase = true) })
     }
 
     companion object {

@@ -97,10 +97,20 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     // ⚠️ Reemplaza con las categorías reales de tu sitio
     private val categoryNames = arrayOf(
-        "Todas", "Acción", "Comedia", "Drama", "Terror", "Ciencia ficción",
+        "Todas",
+        "Acción",
+        "Comedia",
+        "Drama",
+        "Terror",
+        "Ciencia ficción",
     )
     private val categorySlugs = arrayOf(
-        "", "accion", "comedia", "drama", "terror", "ciencia-ficcion",
+        "",
+        "accion",
+        "comedia",
+        "drama",
+        "terror",
+        "ciencia-ficcion",
     )
 
     private class CategoryFilter(names: Array<String>) : AnimeFilter.Select<String>(

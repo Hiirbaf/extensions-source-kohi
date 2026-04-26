@@ -225,6 +225,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
             "doodstream" in url || "dood." in url -> "Doodstream"
             "streamwish" in url -> "StreamWish"
             "filemoon" in url -> "FileMoon"
+            "vidhidevip" in url -> "VidHide"
             "voe.sx" in url -> "VOE"
             "upstream" in url -> "Upstream"
             "mixdrop" in url -> "MixDrop"

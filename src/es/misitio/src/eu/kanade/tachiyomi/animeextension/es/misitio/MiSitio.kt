@@ -27,7 +27,6 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     override val name = "MiSitio"
 
-    // ⚠️ Reemplaza con tu dominio cuando lo tengas
     override val baseUrl = "https://javenspanish.com/"
 
     override val lang = "es"
@@ -38,7 +37,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
     }
 
-    // private val filemoonExtractor by lazy { FilemoonExtractor(client) }
+    private val filemoonExtractor by lazy { FilemoonExtractor(client) }
 
     // VidHideVip usa la misma base que StreamWish
     private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }
@@ -102,7 +101,6 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     // ==================== FILTERS ====================
 
-    // ⚠️ Reemplaza con las categorías reales de tu sitio
     private val categoryNames = arrayOf(
         "Todas",
         "Anal",
@@ -263,9 +261,9 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                 }
 
                 // FM — FileMoon
-                // "filemoon" in src -> {
-                //    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = headers)
-                // }
+                "filemoon" in src -> {
+                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = headers)
+                }
 
                 // NT — player.subespanolvip.com (extracción por regex)
                 "subespanolvip" in src -> {

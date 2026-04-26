@@ -10,6 +10,7 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
+import eu.kanade.tachiyomi.lib.streamwishextractor.StreamWishExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.Headers
@@ -40,7 +41,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
     // private val filemoonExtractor by lazy { FilemoonExtractor(client) }
 
     // VidHideVip usa la misma base que StreamWish
-    // private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }
+    private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }
 
     // ==================== POPULAR ====================
 
@@ -221,9 +222,9 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                 }
 
                 // VD — VidHideVip (misma API que StreamWish)
-                // "vidhidevip" in src || "vidhide" in src -> {
-                //    streamwishExtractor.videosFromUrl(src, videoNameGen = { "$tabLabel - $it" })
-                // }
+                "vidhidevip" in src || "vidhide" in src -> {
+                    streamwishExtractor.videosFromUrl(src, videoNameGen = { "$tabLabel - $it" })
+                }
 
                 // FM — FileMoon
                 // "filemoon" in src -> {

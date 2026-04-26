@@ -2,8 +2,12 @@ ext {
     extName = 'MiSitio'
     extClass = '.MiSitio'
     extVersionCode = 1
-    // ⚠️ Cambia esto al dominio real cuando lo tengas
     containsNsfw = false
 }
 
 apply from: "$rootDir/common.gradle"
+
+dependencies {
+    implementation(project(':lib:filemoon-extractor'))
+    implementation(project(':lib:streamwish-extractor'))
+}

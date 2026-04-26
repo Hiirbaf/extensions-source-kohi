@@ -80,9 +80,8 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                 GET("$baseUrl/?s=$query$pageParam", headers)
             }
             categoryFilter != null && categoryFilter.state != 0 -> {
-                val category = categoryFilter.values[categoryFilter.state]
                 val pageParam = if (page > 1) "/page/$page/" else "/"
-                GET("$baseUrl/category/${category.slug}$pageParam", headers)
+                GET("$baseUrl/category/${categorySlugs[categoryFilter.state]}$pageParam", headers)
             }
             else -> popularAnimeRequest(page)
         }
@@ -96,26 +95,22 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     // ==================== FILTERS ====================
 
-    private data class Category(val name: String, val slug: String)
-
     // ⚠️ Reemplaza con las categorías reales de tu sitio
-    private val categories = arrayOf(
-        Category("Todas", ""),
-        Category("Acción", "accion"),
-        Category("Comedia", "comedia"),
-        Category("Drama", "drama"),
-        Category("Terror", "terror"),
-        Category("Ciencia ficción", "ciencia-ficcion"),
+    private val categoryNames = arrayOf(
+        "Todas", "Acción", "Comedia", "Drama", "Terror", "Ciencia ficción",
+    )
+    private val categorySlugs = arrayOf(
+        "", "accion", "comedia", "drama", "terror", "ciencia-ficcion",
     )
 
-    private class CategoryFilter(values: Array<Category>) : AnimeFilter.Select<String>(
+    private class CategoryFilter(names: Array<String>) : AnimeFilter.Select<String>(
         "Categoría",
-        values.map { it.name }.toTypedArray(),
+        names,
     )
 
     override fun getFilterList() = AnimeFilterList(
         AnimeFilter.Header("Los filtros se ignoran si hay búsqueda por texto"),
-        CategoryFilter(categories),
+        CategoryFilter(categoryNames),
     )
 
     // ==================== DETAILS ====================

@@ -185,28 +185,31 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         val document = response.asJsoup()
         val videos = mutableListOf<Video>()
 
-        // Busca todos los iframes embebidos en el post
-        val iframes = document.select(
-            ".entry-content iframe, .elementor-widget-video iframe, " +
-                ".elementor-text-editor iframe, article iframe",
-        )
-
-        iframes.forEachIndexed { index, iframe ->
+        // Busca las tabs de Elementor con su label (VD, FM, NT, etc.)
+        val tabs = document.select("div.elementor-tab-content")
+        tabs.forEachIndexed { index, tab ->
+            val iframe = tab.selectFirst("iframe") ?: return@forEachIndexed
             val src = iframe.attr("src").ifEmpty { iframe.attr("data-lazy-src") }
-            if (src.isNotEmpty()) {
-                val serverName = detectServer(src, index + 1)
-                videos.add(Video(src, serverName, src))
-            }
+            if (src.isEmpty()) return@forEachIndexed
+
+            // El label está en el elementor-tab-title con el mismo data-tab
+            val tabNumber = tab.attr("data-tab")
+            val label = document.selectFirst(
+                "div.elementor-tab-title[data-tab=$tabNumber]:not(.elementor-tab-mobile-title)",
+            )?.text()?.trim() ?: "Servidor ${index + 1}"
+
+            val serverName = "$label · ${detectServer(src, index + 1)}"
+            videos.add(Video(src, serverName, src))
         }
 
-        // Fallback: busca iframes en el HTML completo (a veces Elementor los pone en data-*)
+        // Fallback: cualquier iframe en la página que no sea del propio sitio
         if (videos.isEmpty()) {
-            val iframeRegex = Regex("""<iframe[^>]+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            iframeRegex.findAll(document.html()).forEachIndexed { index, match ->
-                val src = match.groupValues[1]
-                if (src.startsWith("http") && !src.contains(baseUrl.removePrefix("https://"))) {
-                    val serverName = detectServer(src, index + 1)
-                    videos.add(Video(src, serverName, src))
+            document.select("iframe").forEachIndexed { index, iframe ->
+                val src = iframe.attr("src").ifEmpty { iframe.attr("data-lazy-src") }
+                if (src.startsWith("http") && baseUrl.isNotEmpty() &&
+                    !src.contains(baseUrl.removePrefix("https://").removePrefix("http://"))
+                ) {
+                    videos.add(Video(src, detectServer(src, index + 1), src))
                 }
             }
         }

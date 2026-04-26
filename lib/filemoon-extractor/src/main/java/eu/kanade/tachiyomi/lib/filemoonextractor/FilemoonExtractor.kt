@@ -22,7 +22,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 class FilemoonExtractor(private val client: OkHttpClient, private val preferences: SharedPreferences? = null) {
-    private val playlistUtils by lazy { PlaylistUtils(client) }
+    private val playlistUtils by lazy { PlaylistUtils(client, Headers.Builder().build()) }
     private val json: Json by injectLazy()
 
     //Credit: https://github.com/skoruppa/docchi-stremio-addon/blob/main/app/players/filemoon.py

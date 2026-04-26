@@ -26,7 +26,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
     override val name = "MiSitio"
 
     // ⚠️ Reemplaza con tu dominio cuando lo tengas
-    override val baseUrl = "javenspanish.com"
+    override val baseUrl = "https://javenspanish.com/"
 
     override val lang = "es"
 

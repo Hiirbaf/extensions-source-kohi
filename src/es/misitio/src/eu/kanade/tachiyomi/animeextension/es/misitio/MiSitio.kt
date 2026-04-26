@@ -229,7 +229,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
                 // FM — FileMoon
                 "filemoon" in src -> {
-                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ")
+                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = headers)
                 }
 
                 // NT — player.subespanolvip.com (extracción por regex)

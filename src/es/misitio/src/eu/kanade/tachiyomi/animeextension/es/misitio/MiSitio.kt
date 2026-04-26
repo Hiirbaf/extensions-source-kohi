@@ -39,7 +39,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
     }
 
-    private val filemoonExtractor by lazy { FilemoonExtractor(client, headers) }
+    private val filemoonExtractor by lazy { FilemoonExtractor(client) }
 
     // VidHideVip usa la misma base que StreamWish
     private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }

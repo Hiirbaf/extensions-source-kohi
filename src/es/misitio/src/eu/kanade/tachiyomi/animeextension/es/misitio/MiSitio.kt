@@ -10,7 +10,6 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
-import eu.kanade.tachiyomi.lib.filemoonextractor.FilemoonExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.Headers
@@ -38,7 +37,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
     }
 
-    private val filemoonExtractor by lazy { FilemoonExtractor(client) }
+    // private val filemoonExtractor by lazy { FilemoonExtractor(client) }
 
     // VidHideVip usa la misma base que StreamWish
     // private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }
@@ -227,9 +226,9 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                 // }
 
                 // FM — FileMoon
-                "filemoon" in src -> {
-                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = headers)
-                }
+                // "filemoon" in src -> {
+                //    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = headers)
+                // }
 
                 // NT — player.subespanolvip.com (extracción por regex)
                 "subespanolvip" in src -> {

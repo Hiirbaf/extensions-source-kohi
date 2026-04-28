@@ -1,8 +1,10 @@
 package eu.kanade.tachiyomi.animeextension.es.misitio
 
 import android.app.Application
+import android.content.SharedPreferences
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
+import dev.datlag.jsunpacker.JsUnpacker
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
@@ -28,20 +30,19 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     override val name = "MiSitio"
 
+    // ⚠️ Reemplaza con tu dominio cuando lo tengas
     override val baseUrl = "https://javenspanish.com/"
 
     override val lang = "es"
 
     override val supportsLatest = true
 
-    private val preferences by lazy {
+    private val preferences: SharedPreferences by lazy {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
     }
 
     private val filemoonExtractor by lazy { FilemoonExtractor(client) }
-
-    // VidHideVip usa la misma base que StreamWish
-    private val streamwishExtractor by lazy { StreamWishExtractor(client, headers) }
+    private val streamWishExtractor by lazy { StreamWishExtractor(client, headers) }
 
     // ==================== POPULAR ====================
 
@@ -50,21 +51,21 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         return GET(url, headers)
     }
 
-    override fun popularAnimeSelector() = "article.post, div.elementor-post"
+    override fun popularAnimeSelector() = "article.cpg-card"
 
     override fun popularAnimeFromElement(element: Element): SAnime {
         val anime = SAnime.create()
         val link = element.selectFirst("a[href]")!!
         anime.setUrlWithoutDomain(link.attr("href"))
-        anime.title = element.selectFirst("h2, h3, .entry-title, .elementor-post__title")
+        anime.title = element.selectFirst("h3.cpg-title, h2, h3, .entry-title")
             ?.text()?.trim() ?: link.attr("title")
         anime.thumbnail_url = element.selectFirst("noscript img")?.attr("src")
             ?: element.selectFirst("img")?.attr("data-src")
-            ?: element.selectFirst("img")?.attr("data-lazy-src")
+            ?: element.selectFirst("img")?.attr("src")
         return anime
     }
 
-    override fun popularAnimeNextPageSelector() = "a.next.page-numbers, .elementor-pagination a.next"
+    override fun popularAnimeNextPageSelector() = "a.next.page-numbers, .cpg-pagination a.next, nav.navigation a.next"
 
     // ==================== LATEST ====================
 
@@ -102,6 +103,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     // ==================== FILTERS ====================
 
+    // ⚠️ Reemplaza con las categorías reales de tu sitio
     private val categoryNames = arrayOf(
         "Todas",
         "Anal",
@@ -220,18 +222,38 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     // ==================== VIDEO ====================
 
-    // Headers para requests a servidores externos
-    private fun refererHeaders(refererUrl: String): Headers = headers.newBuilder()
-        .set("Referer", refererUrl)
+    private fun refererHeaders(referer: String): Headers = headers.newBuilder()
+        .set("Referer", referer)
         .build()
 
-    // Extrae m3u8 desde player.subespanolvip.com (servidor NT) por regex
+    // VD — VidHideVip: desempaqueta eval/packed y extrae m3u8
+    private fun videosFromVidHide(embedUrl: String, label: String): List<Video> =
+        runCatching {
+            val doc = client.newCall(GET(embedUrl, refererHeaders(baseUrl))).execute().asJsoup()
+            val script = doc.selectFirst("script:containsData(m3u8)")?.data()
+                ?: return emptyList()
+            val unpacked = if (script.contains("eval(function(p,a,c")) {
+                JsUnpacker.unpackAndCombine(script) ?: script
+            } else {
+                script
+            }
+            val m3u8 = Regex("""https[^"'\s]*\.m3u8[^"'\s]*""").find(unpacked)
+                ?.value ?: return emptyList()
+            listOf(Video(m3u8, label, m3u8, refererHeaders(embedUrl)))
+        }.getOrElse { emptyList() }
+
+    // NT — player.subespanolvip.com: extrae m3u8 por regex
     private fun videosFromSubespanol(embedUrl: String, label: String): List<Video> =
         runCatching {
-            val html = client.newCall(GET(embedUrl, refererHeaders(baseUrl))).execute()
-                .asJsoup().html()
-            val m3u8 = Regex("""(https?://[^"'\s]+\.m3u8[^"'\s]*)""").find(html)
-                ?.groupValues?.get(1) ?: return emptyList()
+            val doc = client.newCall(GET(embedUrl, refererHeaders(baseUrl))).execute().asJsoup()
+            val script = doc.selectFirst("script:containsData(m3u8)")?.data() ?: doc.html()
+            val unpacked = if (script.contains("eval(function(p,a,c")) {
+                JsUnpacker.unpackAndCombine(script) ?: script
+            } else {
+                script
+            }
+            val m3u8 = Regex("""https[^"'\s]*\.m3u8[^"'\s]*""").find(unpacked)
+                ?.value ?: return emptyList()
             listOf(Video(m3u8, label, m3u8, refererHeaders(embedUrl)))
         }.getOrElse { emptyList() }
 
@@ -239,7 +261,6 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         val document = response.asJsoup()
         val videos = mutableListOf<Video>()
 
-        // Recolecta todos los iframes de las tabs de Elementor
         document.select("div.elementor-tab-content").forEachIndexed { index, tab ->
             val iframe = tab.selectFirst("iframe") ?: return@forEachIndexed
             val src = iframe.attr("src").ifEmpty { iframe.attr("data-lazy-src") }
@@ -256,34 +277,24 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                     listOf(Video(src, tabLabel, src, refererHeaders(baseUrl)))
                 }
 
-                // VD — VidHideVip (misma API que StreamWish)
+                // VD — VidHideVip
                 "vidhidevip" in src || "vidhide" in src -> {
-                    streamwishExtractor.videosFromUrl(src, videoNameGen = { "$tabLabel - $it" })
+                    videosFromVidHide(src, tabLabel)
                 }
 
                 // FM — FileMoon
                 "filemoon" in src -> {
-                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = headers)
+                    filemoonExtractor.videosFromUrl(src, prefix = "$tabLabel - ", headers = refererHeaders(baseUrl))
                 }
 
-                // NT — player.subespanolvip.com (extracción por regex)
+                // NT — player.subespanolvip.com
                 "subespanolvip" in src -> {
                     videosFromSubespanol(src, tabLabel)
                 }
 
-                // Fallback genérico para servidores desconocidos
+                // Fallback — StreamWish y dominios desconocidos
                 else -> {
-                    runCatching {
-                        val html = client.newCall(GET(src, refererHeaders(baseUrl))).execute()
-                            .asJsoup().html()
-                        val m3u8 = Regex("""(https?://[^"'\s]+\.m3u8[^"'\s]*)""").find(html)
-                            ?.groupValues?.get(1)
-                        if (m3u8 != null) {
-                            listOf(Video(m3u8, tabLabel, m3u8, refererHeaders(src)))
-                        } else {
-                            emptyList()
-                        }
-                    }.getOrElse { emptyList() }
+                    streamWishExtractor.videosFromUrl(src, videoNameGen = { "$tabLabel - $it" })
                 }
             }
 

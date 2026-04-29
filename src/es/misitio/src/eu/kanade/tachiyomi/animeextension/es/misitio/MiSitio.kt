@@ -59,7 +59,8 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         anime.setUrlWithoutDomain(link.attr("href"))
         anime.title = element.selectFirst("h3.cpg-title, h2, h3, .entry-title")
             ?.text()?.trim() ?: link.attr("title")
-        anime.thumbnail_url = element.selectFirst("noscript img")?.attr("src")
+        anime.thumbnail_url = element.selectFirst("picture img")?.attr("src")
+            ?: element.selectFirst("noscript img")?.attr("src")
             ?: element.selectFirst("img")?.attr("data-src")
             ?: element.selectFirst("img")?.attr("src")
         return anime

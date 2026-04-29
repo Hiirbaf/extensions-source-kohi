@@ -181,9 +181,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
             ?: document.selectFirst(".entry-content img, .elementor-widget-image img")
                 ?.let { it.attr("data-lazy-src").ifEmpty { it.attr("src") } }
 
-        anime.description = document.selectFirst(
-            "span[dir=auto], .elementor-text-editor span[dir=auto], .entry-content p",
-        )?.text()?.trim()
+        anime.description = document.select("span[dir=auto]").joinToString("\n\n") { it.text().trim() }.ifEmpty { null }
 
         anime.genre = document.select("a[rel=tag], .elementor-post-info__terms-list a")
             .joinToString(", ") { it.text() }

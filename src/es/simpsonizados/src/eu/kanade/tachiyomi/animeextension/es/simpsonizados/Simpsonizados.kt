@@ -5,7 +5,7 @@ import eu.kanade.tachiyomi.multisrc.dooplay.Dooplay
 class Simpsonizados : Dooplay(
     "Simpsonizados",
     "https://simpsonizados.me",
-    "es"
+    "es",
 ) {
     override val usesDecoding = true
 

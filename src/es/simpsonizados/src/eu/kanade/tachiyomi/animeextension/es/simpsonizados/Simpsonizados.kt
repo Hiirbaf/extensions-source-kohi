@@ -17,6 +17,8 @@ class Simpsonizados : DooPlay(
     override fun popularAnimeRequest(page: Int): Request =
         GET("$baseUrl/temp/page/$page", headers)
 
+    override fun popularAnimeSelector() = "div.content article > div.poster"
+
     override fun popularAnimeNextPageSelector() =
         "div.resppages > a > span.fa-chevron-right"
 }

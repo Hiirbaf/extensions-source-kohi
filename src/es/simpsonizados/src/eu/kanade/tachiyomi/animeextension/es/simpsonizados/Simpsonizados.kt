@@ -9,7 +9,7 @@ class Simpsonizados : Dooplay(
 ) {
     override val usesDecoding = true
 
-    // Listado de temporadas
+    // temporadas
     override fun getMainPageUrl(page: Int) = if (page > 1) {
         "$baseUrl/temp/page/$page/"
     } else {

@@ -182,7 +182,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                 ?.let { it.attr("data-lazy-src").ifEmpty { it.attr("src") } }
 
         anime.description = document.selectFirst(
-            ".entry-content p, .elementor-text-editor p",
+            "span[dir=auto], .elementor-text-editor span[dir=auto], .entry-content p",
         )?.text()?.trim()
 
         anime.genre = document.select("a[rel=tag], .elementor-post-info__terms-list a")

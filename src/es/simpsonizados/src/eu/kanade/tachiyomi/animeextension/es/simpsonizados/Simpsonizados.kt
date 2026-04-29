@@ -12,7 +12,7 @@ class Simpsonizados : DooPlay(
     baseUrl = "https://simpsonizados.me",
 ) {
     // ======== Latest = episodios recientes ========
-    override val latestUpdatesPath = "cap"
+    override val latestUpdatesPath = "temp"
 
     // ======== Popular = lista de temporadas ========
     override fun popularAnimeRequest(page: Int): Request =

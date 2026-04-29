@@ -47,7 +47,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
     // ==================== POPULAR ====================
 
     override fun popularAnimeRequest(page: Int): Request {
-        val url = if (page == 1) baseUrl else "$baseUrl/page/$page/"
+        val url = if (page == 1) baseUrl else "$baseUrl/?cpg_page=$page"
         return GET(url, headers)
     }
 
@@ -66,7 +66,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
         return anime
     }
 
-    override fun popularAnimeNextPageSelector() = "a.next.page-numbers, .cpg-pagination a.next, nav.navigation a.next"
+    override fun popularAnimeNextPageSelector() = ".cpg-pagination a[href*=cpg_page]:last-of-type"
 
     // ==================== LATEST ====================
 
@@ -89,8 +89,9 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
                 GET("$baseUrl/?s=$query$pageParam", headers)
             }
             categoryFilter != null && categoryFilter.state != 0 -> {
-                val pageParam = if (page > 1) "/page/$page/" else "/"
-                GET("$baseUrl/category/${categorySlugs[categoryFilter.state]}$pageParam", headers)
+                val slug = categorySlugs[categoryFilter.state]
+                val pageParam = if (page > 1) "&cpg_page=$page" else ""
+                GET("$baseUrl/?category=$slug$pageParam", headers)
             }
             else -> popularAnimeRequest(page)
         }

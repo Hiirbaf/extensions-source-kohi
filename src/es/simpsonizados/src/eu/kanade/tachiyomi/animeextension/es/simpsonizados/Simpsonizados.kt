@@ -1,36 +1,18 @@
 package eu.kanade.tachiyomi.animeextension.es.simpsonizados
 
-import eu.kanade.tachiyomi.multisrc.dooplay.Dooplay
+import eu.kanade.tachiyomi.multisrc.dooplay.DooPlay
 
-class Simpsonizados : Dooplay(
-    "Simpsonizados",
-    "https://simpsonizados.me",
-    "es",
+class Simpsonizados : DooPlay(
+    lang = "es",
+    name = "Simpsonizados",
+    baseUrl = "https://simpsonizados.me",
 ) {
-    override val usesDecoding = true
+    // La paginación de main page usa /temp en lugar de /episodes
+    override val latestUpdatesPath = "temp"
 
-    // temporadas
-    override fun getMainPageUrl(page: Int) = if (page > 1) {
-        "$baseUrl/temp/page/$page/"
-    } else {
-        "$baseUrl/temp"
-    }
+    // Prefijo de temporada en español
+    override val episodeSeasonPrefix = "Temporada"
 
-    // Selector CSS para cada temporada en la lista
-    override val mainPageSelector = "div.items > article"
-
-    // Selector CSS para episodios de cada temporada
-    override val episodeListSelector = "ul.episodios > li"
-
-    // Selector CSS para el enlace de episodio dentro del <li>
-    override val episodeUrlSelector = "div.episodiotitle > a"
-
-    // Nombre del episodio
-    override val episodeNameSelector = "div.episodiotitle > a"
-
-    // Fecha
-    override val episodeDateSelector = "span.date"
-
-    // Los videos se obtienen vía la API de Dooplay
-    override val playerApi = "https://simpsonizados.me/wp-json/dooplayer/v2/"
+    // Texto para películas (aunque este sitio es series, por si acaso)
+    override val episodeMovieText = "Película"
 }

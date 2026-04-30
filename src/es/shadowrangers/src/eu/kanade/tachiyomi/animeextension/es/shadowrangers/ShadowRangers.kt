@@ -100,25 +100,25 @@ class ShadowRangers : AnimeHttpSource() {
 
     override fun episodeListParse(response: Response): List<SEpisode> {
         val doc = response.asJsoup()
-        // DooPlay theme: episodes are listed in ul.episodios or div#episodios
         val episodes = mutableListOf<SEpisode>()
 
-        // Try season/episode list structure
-        doc.select("ul.episodios li, #episodios li").forEach { li ->
-            val anchor = li.selectFirst("a") ?: return@forEach
-            val epNum = li.selectFirst(".NumEp")?.text()?.trim()
-            val epName = li.selectFirst(".Title")?.text()?.trim() ?: epNum ?: ""
+        doc.select("#episodes ul.episodios li").forEach { li ->
+            val anchor = li.selectFirst("div.episodiotitle a") ?: return@forEach
+            val epNumText = li.selectFirst("div.numerando")?.text()?.trim() // "1 - 1"
+            val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
+            val epName = anchor.text().trim()
+            val dateUpload = li.selectFirst("span.date")?.text() // Si quieres parsear a timestamp, se puede
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
-                    episode_number = epNum?.toFloatOrNull() ?: 0f
                     name = epName
-                    date_upload = 0L
+                    episode_number = epNum
+                    // date_upload = ... aquí podrías convertir dateUpload a timestamp si quieres
                 },
             )
         }
 
-        // If it's a movie/single-page, create one episode pointing to itself
+        // Si no hay episodios, crear uno genérico
         if (episodes.isEmpty()) {
             episodes.add(
                 SEpisode.create().apply {

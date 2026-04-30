@@ -115,18 +115,31 @@ class Simpsonizados : DooPlay(
     }
 
     private fun getVideokVideos(embedUrl: String, label: String): List<Video> {
-        val embedHeaders = headers.newBuilder()
-            .add("Referer", baseUrl)
+        val fileCode = embedUrl.substringAfterLast("/").removeSuffix(".html").substringAfterLast("-")
+
+        android.util.Log.e("Simpsonizados", "fileCode: $fileCode")
+
+        val postHeaders = headers.newBuilder()
+            .add("Referer", embedUrl)
+            .add("Origin", "https://videok.pro")
+            .build()
+
+        val postBody = FormBody.Builder()
+            .add("op", "embed")
+            .add("file_code", fileCode)
+            .add("auto", "1")
+            .add("referer", baseUrl)
             .build()
 
         val html = runCatching {
-            client.newCall(GET(embedUrl, embedHeaders)).execute().body.string()
+            client.newCall(POST("https://videok.pro/dl", postHeaders, postBody))
+                .execute().body.string()
         }.getOrElse {
-            android.util.Log.e("Simpsonizados", "Error fetching embed: $embedUrl", it)
+            android.util.Log.e("Simpsonizados", "Error POST /dl", it)
             return emptyList()
         }
 
-        android.util.Log.e("Simpsonizados", "Embed HTML snippet: ${html.take(500)}")
+        android.util.Log.e("Simpsonizados", "POST response snippet: ${html.take(300)}")
 
         val masterUrl = html
             .substringAfter("sources: [{src: \"")
@@ -144,16 +157,9 @@ class Simpsonizados : DooPlay(
         val masterPlaylist = client.newCall(GET(masterUrl, masterHeaders)).execute().body.string()
         val baseM3u8Url = masterUrl.substringBeforeLast("/")
 
-        android.util.Log.e("Simpsonizados", "Master playlist: ${masterPlaylist.take(300)}")
-
-        val qualities = mapOf(
-            "360" to "360p",
-            "480" to "480p",
-            "720" to "720p",
-            "1080" to "1080p",
-        )
-
+        val qualities = mapOf("360" to "360p", "480" to "480p", "720" to "720p", "1080" to "1080p")
         val videos = mutableListOf<Video>()
+
         masterPlaylist.lines().forEachIndexed { i, line ->
             if (line.contains("RESOLUTION") || line.contains("BANDWIDTH")) {
                 val quality = qualities.entries
@@ -168,8 +174,6 @@ class Simpsonizados : DooPlay(
 
         android.util.Log.e("Simpsonizados", "Videos found: ${videos.size}")
 
-        return videos.ifEmpty {
-            listOf(Video(masterUrl, label, masterUrl, masterHeaders))
-        }
+        return videos.ifEmpty { listOf(Video(masterUrl, label, masterUrl, masterHeaders)) }
     }
 }

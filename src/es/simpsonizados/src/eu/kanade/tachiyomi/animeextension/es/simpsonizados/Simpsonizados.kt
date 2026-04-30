@@ -31,21 +31,16 @@ class Simpsonizados : DooPlay(
     override val seasonListSelector = "div#seasons > div"
 
     override fun getSeasonEpisodes(season: Element): List<SEpisode> {
-        val seasonNum = season.selectFirst("div[id^=season-]")
-            ?.id()
-            ?.removePrefix("season-")
-            ?: season.selectFirst("span, div")?.text()?.trim()
-            ?: "?"
-
-        return season.select("ul > li").mapNotNull { li ->
+        return season.select("ul.episodios > li").mapNotNull { li ->
             runCatching {
-                val a = li.selectFirst("a[href]") ?: return@runCatching null
-                val epNum = a.text().substringBefore(" - ").trim()
+                val numerando = li.selectFirst("div.numerando")!!.text().trim()
+                // "35 - 1" -> seasonNum=35, epNum=1
+                val (seasonNum, epNum) = numerando.split(" - ").map { it.trim() }
+                val a = li.selectFirst("div.episodiotitle > a")!!
                 SEpisode.create().apply {
-                    name = "$episodeSeasonPrefix $seasonNum x $epNum - ${a.text().substringAfter(" - ").trim()}"
+                    name = "$episodeSeasonPrefix $seasonNum x $epNum - ${a.text()}"
                     episode_number = epNum.toFloatOrNull() ?: 0F
-                    date_upload = li.selectFirst("span.date, span")
-                        ?.text()?.toDate() ?: 0L
+                    date_upload = li.selectFirst("span.date")?.text()?.toDate() ?: 0L
                     setUrlWithoutDomain(a.attr("href"))
                 }
             }.getOrNull()

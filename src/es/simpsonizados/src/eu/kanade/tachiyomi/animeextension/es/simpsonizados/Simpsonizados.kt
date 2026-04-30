@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.animeextension.es.simpsonizados
 
+import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.multisrc.dooplay.DooPlay
 import eu.kanade.tachiyomi.network.GET

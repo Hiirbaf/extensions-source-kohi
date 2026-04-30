@@ -117,8 +117,6 @@ class Simpsonizados : DooPlay(
     private fun getVideokVideos(embedUrl: String, label: String): List<Video> {
         val fileCode = embedUrl.substringAfterLast("/").removeSuffix(".html").substringAfterLast("-")
 
-        android.util.Log.e("Simpsonizados", "fileCode: $fileCode")
-
         val postHeaders = headers.newBuilder()
             .add("Referer", embedUrl)
             .add("Origin", "https://videok.pro")
@@ -175,5 +173,6 @@ class Simpsonizados : DooPlay(
 
             videos.add(Video(videoUrl, "$label - $quality", videoUrl, masterHeaders))
         }
+        return videos.ifEmpty { listOf(Video(masterUrl, label, masterUrl, masterHeaders)) }
     }
 }

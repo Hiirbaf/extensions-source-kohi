@@ -47,11 +47,12 @@ class Simpsonizados : DooPlay(
 
         // Si es una página de capítulo individual (/cap/), devolver solo ese episodio
         if (url.contains("/cap/")) {
-            val numerando = doc.selectFirst("div.numerando")?.text()?.trim() ?: ""
-            val (seasonNum, epNum) = numerando.split(" - ").map { it.trim() }.let {
-                if (it.size >= 2) it[0] to it[1] else "?" to "?"
-            }
-            val title = doc.selectFirst("div.data > h2, h2.title")?.text() ?: ""
+            // Extraer de la URL: /cap/los-simpson-28x11/  -> season=28, ep=11
+            val epSlug = url.substringAfterLast("/cap/").trimEnd('/')
+            val match = Regex("(\\d+)x(\\d+)").find(epSlug)
+            val seasonNum = match?.groupValues?.get(1) ?: "?"
+            val epNum = match?.groupValues?.get(2) ?: "?"
+            val title = doc.selectFirst("div.data > h1, h1.title, h2.title")?.text() ?: ""
             return listOf(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(url)

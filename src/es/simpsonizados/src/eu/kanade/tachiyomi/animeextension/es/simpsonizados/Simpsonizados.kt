@@ -116,7 +116,7 @@ class Simpsonizados : DooPlay(
 
     private fun getVideokVideos(embedUrl: String, label: String): List<Video> {
         val fileCode = embedUrl.substringAfterLast("/").substringBefore(".html").substringAfterLast("-")
-    
+
         val postBody = FormBody.Builder()
             .add("op", "embed")
             .add("file_code", fileCode)

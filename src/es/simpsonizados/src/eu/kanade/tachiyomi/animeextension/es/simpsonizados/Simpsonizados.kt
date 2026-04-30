@@ -16,6 +16,12 @@ class Simpsonizados : DooPlay(
     override val episodeSeasonPrefix = "Temporada"
     override val episodeMovieText = "Película"
 
+    // La página de temporada ya tiene los episodios directamente,
+    // no necesita redirigir a ningún lado
+    override val animeMenuSelector = "div.pag_episodes div.item a[href] i.fa-bars"
+
+    override fun getRealAnimeDoc(document: org.jsoup.nodes.Document) = document
+
     override val latestUpdatesPath = "cap"
 
     override fun popularAnimeRequest(page: Int): Request =

@@ -12,7 +12,6 @@ import eu.kanade.tachiyomi.lib.mp4uploadextractor.Mp4uploadExtractor
 import eu.kanade.tachiyomi.lib.streamwishextractor.StreamWishExtractor
 import eu.kanade.tachiyomi.lib.universalextractor.UniversalExtractor
 import eu.kanade.tachiyomi.network.GET
-import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.Request
 import okhttp3.Response
@@ -115,7 +114,7 @@ class ShadowRangers : AnimeHttpSource() {
                     episode_number = epNum?.toFloatOrNull() ?: 0f
                     episode_name = name
                     date_upload = 0L
-                }
+                },
             )
         }
 
@@ -126,7 +125,7 @@ class ShadowRangers : AnimeHttpSource() {
                     setUrlWithoutDomain(response.request.url.toString().removePrefix(baseUrl))
                     episode_name = "Película"
                     episode_number = 1f
-                }
+                },
             )
         }
 
@@ -213,7 +212,7 @@ class ShadowRangers : AnimeHttpSource() {
             Pair("Tokusatsu", "tokusatsu"),
             Pair("Especial", "especial"),
             Pair("Películas", "peliculas"),
-        )
+        ),
     )
 
     private class TypeFilter : UriPartFilter(
@@ -222,7 +221,7 @@ class ShadowRangers : AnimeHttpSource() {
             Pair("<Seleccionar>", ""),
             Pair("Series", "series"),
             Pair("Películas", "peliculas"),
-        )
+        ),
     )
 
     open class UriPartFilter(displayName: String, private val vals: Array<Pair<String, String>>) :

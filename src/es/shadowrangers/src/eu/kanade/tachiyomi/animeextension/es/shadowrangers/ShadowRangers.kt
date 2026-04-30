@@ -42,12 +42,12 @@ class ShadowRangers : AnimeHttpSource() {
 
     override fun latestUpdatesParse(response: Response): AnimesPage {
         val document = response.asJsoup()
-        val animes = document.select("article.TPost.B").map { element ->
+        val animes = document.select("article.item.se.episodes").map { element ->
             SAnime.create().apply {
-                val anchor = element.selectFirst("a")!!
+                val anchor = element.selectFirst("div.data h3 a")!!
                 setUrlWithoutDomain(anchor.attr("href"))
-                title = element.selectFirst(".Title")?.text() ?: ""
-                thumbnail_url = element.selectFirst("img")?.attr("abs:src")
+                title = anchor.text().trim()
+                thumbnail_url = element.selectFirst("div.poster img")?.attr("abs:src")
             }
         }
         val hasNextPage = document.selectFirst("a.next.page-numbers") != null

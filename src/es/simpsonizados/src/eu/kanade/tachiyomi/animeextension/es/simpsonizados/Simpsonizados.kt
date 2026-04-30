@@ -84,7 +84,7 @@ class Simpsonizados : DooPlay(
             val postId = server.attr("data-post")
             val nume = server.attr("data-nume")
             val type = server.attr("data-type")
-            val label = server.selectFirst("span.title")?.text() ?: "Video"
+            val label = server.selectFirst("span.server")?.text() ?: "Video"
 
             runCatching {
                 // Llamada a admin-ajax.php
@@ -115,36 +115,32 @@ class Simpsonizados : DooPlay(
     }
 
     private fun getVideokVideos(embedUrl: String, label: String): List<Video> {
-        val doc = client.newCall(GET(embedUrl, headers)).execute().asJsoup()
+        val fileCode = embedUrl.substringAfterLast("/").substringBefore(".html").substringAfterLast("-")
+    
+        val postBody = FormBody.Builder()
+            .add("op", "embed")
+            .add("file_code", fileCode)
+            .add("auto", "1")
+            .add("referer", "")
+            .build()
 
-        // Buscar el m3u8 en el source de la página
-        val masterUrl = doc.selectFirst("source[src*=m3u8]")?.attr("src")
-            ?: doc.html()
-                .substringAfter("file:\"").substringBefore("\"")
+        val postHeaders = headers.newBuilder()
+            .add("Referer", embedUrl)
+            .build()
+
+        val response = client.newCall(
+            POST("https://videok.pro/dl", postHeaders, postBody),
+        ).execute().body.string()
+
+        // Buscar m3u8 en la respuesta
+        val masterUrl = response
+            .substringAfter("file:\"").substringBefore("\"")
+            .takeIf { it.contains("m3u8") }
+            ?: response
+                .substringAfter("src=\"").substringBefore("\"")
                 .takeIf { it.contains("m3u8") }
             ?: return emptyList()
 
-        // Parsear las calidades del master.m3u8
-        val masterResponse = client.newCall(GET(masterUrl, headers)).execute()
-            .body.string()
-
-        val baseM3u8Url = masterUrl.substringBeforeLast("/")
-
-        return masterResponse.lines()
-            .filter { it.contains(".m3u8") || it.contains(".urlset") }
-            .mapIndexed { i, line ->
-                val quality = when {
-                    "_l," in masterUrl || "360" in line -> "360p"
-                    "_n," in masterUrl || "480" in line -> "480p"
-                    "_h," in masterUrl || "720" in line -> "720p"
-                    "_x," in masterUrl || "1080" in line -> "1080p"
-                    else -> "Video ${i + 1}"
-                }
-                val videoUrl = if (line.startsWith("http")) line else "$baseM3u8Url/$line"
-                Video(videoUrl, "$label - $quality", videoUrl, headers)
-            }
-            .ifEmpty {
-                listOf(Video(masterUrl, label, masterUrl, headers))
-            }
+        return listOf(Video(masterUrl, label, masterUrl, postHeaders))
     }
 }

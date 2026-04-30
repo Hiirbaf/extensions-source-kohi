@@ -54,7 +54,7 @@ class Simpsonizados : DooPlay(
     }
 
     override fun episodeListParse(response: Response): List<SEpisode> {
-        val doc = getRealAnimeDoc(response.asJsoup())
+        val doc = response.asJsoup()
         val seasons = doc.select(seasonListSelector)
         return if (seasons.isEmpty()) {
             listOf(

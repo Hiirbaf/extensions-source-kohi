@@ -32,7 +32,7 @@ class ShadowRangers : AnimeHttpSource() {
 
     override fun popularAnimeParse(response: Response): AnimesPage {
         val document = response.asJsoup()
-        val animes = document.select("article.TPost.B").map { parseAnimeFromElement(it) }
+        val animes = document.select("article.item.tvshows").map { parseAnimeFromElement(it) }
         val hasNextPage = document.selectFirst("a.next.page-numbers") != null
         return AnimesPage(animes, hasNextPage)
     }
@@ -183,11 +183,10 @@ class ShadowRangers : AnimeHttpSource() {
 
     private fun parseAnimeFromElement(element: Element): SAnime {
         return SAnime.create().apply {
-            val anchor = element.selectFirst("a")!!
+            val anchor = element.selectFirst("div.poster a")!!
             setUrlWithoutDomain(anchor.attr("href"))
-            title = element.selectFirst(".Title, h2.Title")?.text() ?: ""
-            thumbnail_url = element.selectFirst("img")?.attr("abs:src")
-                ?: element.selectFirst("img")?.attr("data-src")
+            title = element.selectFirst("h3 a")?.text() ?: ""
+            thumbnail_url = element.selectFirst("div.poster img")?.attr("abs:src")
         }
     }
 

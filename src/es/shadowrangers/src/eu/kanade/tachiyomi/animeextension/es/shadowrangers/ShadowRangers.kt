@@ -194,7 +194,7 @@ class ShadowRangers : AnimeHttpSource() {
                 "vkvideo.ru" in url || "vk.com" in url ->
                     VkExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
                 "voe.sx" in url || "voe-network" in url ->
-                    VoeExtractor(client).videosFromUrl(url, prefix = "$serverName - ")
+                    VoeExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
                 else ->
                     emptyList()
             }

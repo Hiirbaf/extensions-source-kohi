@@ -112,7 +112,7 @@ class ShadowRangers : AnimeHttpSource() {
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
                     episode_number = epNum?.toFloatOrNull() ?: 0f
-                    episode_name = name
+                    name = name
                     date_upload = 0L
                 },
             )
@@ -123,7 +123,7 @@ class ShadowRangers : AnimeHttpSource() {
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(response.request.url.toString().removePrefix(baseUrl))
-                    episode_name = "Película"
+                    name = "Película"
                     episode_number = 1f
                 },
             )

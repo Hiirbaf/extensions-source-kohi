@@ -115,32 +115,48 @@ class Simpsonizados : DooPlay(
     }
 
     private fun getVideokVideos(embedUrl: String, label: String): List<Video> {
-        val fileCode = embedUrl.substringAfterLast("/").substringBefore(".html").substringAfterLast("-")
-
-        val postBody = FormBody.Builder()
-            .add("op", "embed")
-            .add("file_code", fileCode)
-            .add("auto", "1")
-            .add("referer", "")
+        val embedHeaders = headers.newBuilder()
+            .add("Referer", baseUrl)
             .build()
 
-        val postHeaders = headers.newBuilder()
-            .add("Referer", embedUrl)
-            .build()
+        val html = client.newCall(GET(embedUrl, embedHeaders)).execute().body.string()
 
-        val response = client.newCall(
-            POST("https://videok.pro/dl", postHeaders, postBody),
-        ).execute().body.string()
-
-        // Buscar m3u8 en la respuesta
-        val masterUrl = response
-            .substringAfter("file:\"").substringBefore("\"")
+        val masterUrl = html
+            .substringAfter("sources: [{src: \"")
+            .substringBefore("\"")
             .takeIf { it.contains("m3u8") }
-            ?: response
-                .substringAfter("src=\"").substringBefore("\"")
-                .takeIf { it.contains("m3u8") }
             ?: return emptyList()
 
-        return listOf(Video(masterUrl, label, masterUrl, postHeaders))
+        // Parsear calidades del master m3u8
+        val masterHeaders = headers.newBuilder()
+            .add("Referer", "https://videok.pro/")
+            .build()
+
+        val masterPlaylist = client.newCall(GET(masterUrl, masterHeaders)).execute().body.string()
+        val baseUrl = masterUrl.substringBeforeLast("/")
+
+        val qualities = mapOf(
+            "360" to "360p",
+            "480" to "480p",
+            "720" to "720p",
+            "1080" to "1080p",
+        )
+
+        val videos = mutableListOf<Video>()
+        masterPlaylist.lines().forEachIndexed { i, line ->
+            if (line.contains("RESOLUTION") || line.contains("BANDWIDTH")) {
+                val quality = qualities.entries
+                    .firstOrNull { masterPlaylist.lines().getOrNull(i + 1)?.contains(it.key) == true }
+                    ?.value ?: "Video"
+                val videoUrl = masterPlaylist.lines().getOrNull(i + 1)
+                    ?.let { if (it.startsWith("http")) it else "$baseUrl/$it" }
+                    ?: return@forEachIndexed
+                videos.add(Video(videoUrl, "$label - $quality", videoUrl, masterHeaders))
+            }
+        }
+
+        return videos.ifEmpty {
+            listOf(Video(masterUrl, label, masterUrl, masterHeaders))
+        }
     }
 }

@@ -74,44 +74,34 @@ class Simpsonizados : DooPlay(
     }
 
     // ======== Video Links ========
-    override fun videoListParse(response: Response): List<Video> {
-        val doc = response.asJsoup()
+    private fun getVideokVideos(embedUrl: String, label: String): List<Video> {
+        val fileCode = embedUrl.substringAfterLast("/").substringBefore(".html").substringAfterLast("-")
 
-        // Obtener post ID y servidores del HTML
-        val servers = doc.select("ul#playeroptionsul > li")
+        val postBody = FormBody.Builder()
+            .add("op", "embed")
+            .add("file_code", fileCode)
+            .add("auto", "1")
+            .add("referer", "")
+            .build()
 
-        return servers.flatMap { server ->
-            val postId = server.attr("data-post")
-            val nume = server.attr("data-nume")
-            val type = server.attr("data-type")
-            val label = server.selectFirst("span.title")?.text() ?: "Video"
+        val postHeaders = headers.newBuilder()
+            .add("Referer", embedUrl)
+            .build()
 
-            runCatching {
-                // Llamada a admin-ajax.php
-                val body = FormBody.Builder()
-                    .add("action", "doo_player_ajax")
-                    .add("post", postId)
-                    .add("nume", nume)
-                    .add("type", type)
-                    .build()
+        val response = client.newCall(
+            POST("https://videok.pro/dl", postHeaders, postBody),
+        ).execute().body.string()
 
-                val ajaxResponse = client.newCall(
-                    POST("$baseUrl/wp-admin/admin-ajax.php", headers, body),
-                ).execute()
+        // Buscar m3u8 en la respuesta
+        val masterUrl = response
+            .substringAfter("file:\"").substringBefore("\"")
+            .takeIf { it.contains("m3u8") }
+            ?: response
+                .substringAfter("src=\"").substringBefore("\"")
+                .takeIf { it.contains("m3u8") }
+            ?: return emptyList()
 
-                val embedUrl = ajaxResponse.body.string()
-                    .let { json ->
-                        json.substringAfter("\"embed_url\":\"")
-                            .substringBefore("\"")
-                            .replace("\\/", "/")
-                    }
-
-                when {
-                    "videok.pro" in embedUrl -> getVideokVideos(embedUrl, label)
-                    else -> emptyList()
-                }
-            }.getOrElse { emptyList() }
-        }
+        return listOf(Video(masterUrl, label, masterUrl, postHeaders))
     }
 
     private fun getVideokVideos(embedUrl: String, label: String): List<Video> {

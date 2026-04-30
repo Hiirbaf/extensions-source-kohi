@@ -134,7 +134,6 @@ class ShadowRangers : AnimeHttpSource() {
         val doc = response.asJsoup()
         val videos = mutableListOf<Video>()
 
-        // DooPlay: each server <li> has data-post (post ID), data-nume (server index), data-type
         val serverItems = doc.select("ul.TPlayerNv li[data-post][data-nume], #playeroptionsul li[data-post]")
 
         if (serverItems.isNotEmpty()) {
@@ -194,8 +193,8 @@ class ShadowRangers : AnimeHttpSource() {
             when {
                 "vkvideo.ru" in url || "vk.com" in url ->
                     VkExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
-                "voe.sx" in url || "voe.video" in url ->
-                    VoeExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
+                "voe.sx" in url || "voe-network" in url ->
+                    VoeExtractor(client).videosFromUrl(url, prefix = "$serverName - ")
                 else ->
                     emptyList()
             }

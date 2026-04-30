@@ -247,5 +247,4 @@ class ShadowRangers : AnimeHttpSource() {
         AnimeFilter.Select<String>(displayName, vals.map { it.first }.toTypedArray()) {
         fun toUriPart() = vals[state].second
     }
-                  }
-                  
+}

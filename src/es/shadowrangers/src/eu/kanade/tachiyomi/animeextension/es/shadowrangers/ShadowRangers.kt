@@ -8,6 +8,7 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.lib.vkextractor.VkExtractor
+import eu.kanade.tachiyomi.lib.voeextractor.VoeExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.util.asJsoup
@@ -193,6 +194,8 @@ class ShadowRangers : AnimeHttpSource() {
             when {
                 "vkvideo.ru" in url || "vk.com" in url ->
                     VkExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
+                "voe.sx" in url || "voe.video" in url ->
+                    VoeExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
                 else ->
                     emptyList()
             }

@@ -7,15 +7,13 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
-import eu.kanade.tachiyomi.lib.doodextractor.DoodExtractor
-import eu.kanade.tachiyomi.lib.mp4uploadextractor.Mp4uploadExtractor
-import eu.kanade.tachiyomi.lib.streamwishextractor.StreamWishExtractor
-import eu.kanade.tachiyomi.lib.universalextractor.UniversalExtractor
+import eu.kanade.tachiyomi.lib.vkextractor.VkExtractor
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.util.asJsoup
+import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.Response
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 class ShadowRangers : AnimeHttpSource() {
@@ -47,7 +45,6 @@ class ShadowRangers : AnimeHttpSource() {
         val animes = document.select("article.TPost.B").map { element ->
             SAnime.create().apply {
                 val anchor = element.selectFirst("a")!!
-                // Each item here is an episode; point to the series URL
                 setUrlWithoutDomain(anchor.attr("href"))
                 title = element.selectFirst(".Title")?.text() ?: ""
                 thumbnail_url = element.selectFirst("img")?.attr("abs:src")
@@ -107,18 +104,16 @@ class ShadowRangers : AnimeHttpSource() {
             val epNumText = li.selectFirst("div.numerando")?.text()?.trim() // "1 - 1"
             val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
             val epName = anchor.text().trim()
-            val dateUpload = li.selectFirst("span.date")?.text() // Si quieres parsear a timestamp, se puede
+            val dateUpload = li.selectFirst("span.date")?.text()
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
                     name = epName
                     episode_number = epNum
-                    // date_upload = ... aquí podrías convertir dateUpload a timestamp si quieres
                 },
             )
         }
 
-        // Si no hay episodios, crear uno genérico
         if (episodes.isEmpty()) {
             episodes.add(
                 SEpisode.create().apply {
@@ -138,13 +133,25 @@ class ShadowRangers : AnimeHttpSource() {
         val doc = response.asJsoup()
         val videos = mutableListOf<Video>()
 
-        // DooPlay stores player sources in <li data-src="..."> or Option elements
-        val serverItems = doc.select("ul.TPlayerNv li, #playeroptionsul li")
-        serverItems.forEach { item ->
-            val embedUrl = item.attr("data-src").trim()
-                .ifEmpty { item.attr("data-post").trim() }
-            if (embedUrl.isNotEmpty()) {
-                videos.addAll(extractVideosFromEmbed(embedUrl, doc))
+        // DooPlay: each server <li> has data-post (post ID), data-nume (server index), data-type
+        val serverItems = doc.select("ul.TPlayerNv li[data-post][data-nume], #playeroptionsul li[data-post]")
+
+        if (serverItems.isNotEmpty()) {
+            val postId = serverItems.first()!!.attr("data-post")
+            val nonce = doc.select("script").mapNotNull { script ->
+                Regex("""["']?nonce["']?\s*:\s*["']([a-f0-9]+)["']""")
+                    .find(script.data())?.groupValues?.get(1)
+            }.firstOrNull() ?: ""
+
+            serverItems.forEach { item ->
+                val nume = item.attr("data-nume")
+                val type = item.attr("data-type").ifEmpty { "episode" }
+                val serverLabel = item.selectFirst("span, .srvName")?.text()?.trim()
+                    ?: "Server $nume"
+                val embedUrl = fetchPlayerUrl(postId, nume, type, nonce)
+                if (embedUrl.isNotEmpty()) {
+                    videos.addAll(extractVideosFromEmbed(embedUrl, serverLabel))
+                }
             }
         }
 
@@ -153,28 +160,41 @@ class ShadowRangers : AnimeHttpSource() {
             doc.select("iframe[src]").forEach { iframe ->
                 val src = iframe.attr("abs:src")
                 if (src.isNotEmpty()) {
-                    videos.addAll(extractVideosFromEmbed(src, doc))
+                    videos.addAll(extractVideosFromEmbed(src, "Server"))
                 }
             }
         }
 
-        return videos.ifEmpty { emptyList() }
+        return videos
     }
 
-    private fun extractVideosFromEmbed(url: String, doc: Document): List<Video> {
+    private fun fetchPlayerUrl(postId: String, nume: String, type: String, nonce: String): String {
+        return runCatching {
+            val bodyBuilder = FormBody.Builder()
+                .add("action", "doo_player_ajax")
+                .add("post", postId)
+                .add("nume", nume)
+                .add("type", type)
+            if (nonce.isNotEmpty()) bodyBuilder.add("nonce", nonce)
+
+            val json = client.newCall(
+                POST("$baseUrl/wp-admin/admin-ajax.php", headers, bodyBuilder.build()),
+            ).execute().body.string()
+
+            // Response: {"embed_url":"https:\/\/...","type":"iframe"}
+            Regex(""""embed_url"\s*:\s*"([^"]+)"""")
+                .find(json)?.groupValues?.get(1)
+                ?.replace("\\/", "/") ?: ""
+        }.getOrDefault("")
+    }
+
+    private fun extractVideosFromEmbed(url: String, serverName: String): List<Video> {
         return runCatching {
             when {
-                "dood" in url || "doodstream" in url ->
-                    DoodExtractor(client).videoFromUrl(url)?.let { listOf(it) } ?: emptyList()
-
-                "mp4upload" in url ->
-                    Mp4uploadExtractor(client).videosFromUrl(url, headers)
-
-                "streamwish" in url || "wishembed" in url ->
-                    StreamWishExtractor(client, headers).videosFromUrl(url)
-
+                "vkvideo.ru" in url || "vk.com" in url ->
+                    VkExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
                 else ->
-                    UniversalExtractor(client).videosFromUrl(url, headers)
+                    emptyList()
             }
         }.getOrDefault(emptyList())
     }
@@ -227,4 +247,5 @@ class ShadowRangers : AnimeHttpSource() {
         AnimeFilter.Select<String>(displayName, vals.map { it.first }.toTypedArray()) {
         fun toUriPart() = vals[state].second
     }
-}
+                  }
+                  

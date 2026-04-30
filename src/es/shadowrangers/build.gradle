@@ -1,0 +1,15 @@
+ext {
+    extName = 'Shadow-Rangers'
+    extClass = '.ShadowRangersFactory'
+    extVersionCode = 1
+    isNsfw = false
+}
+
+apply from: "$rootDir/common.gradle"
+
+dependencies {
+    implementation(project(':lib:dood-extractor'))
+    implementation(project(':lib:mp4upload-extractor'))
+    implementation(project(':lib:streamwish-extractor'))
+    implementation(project(':lib:universal-extractor'))
+}

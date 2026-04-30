@@ -6,6 +6,7 @@ import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.Request
 import okhttp3.Response
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 class Simpsonizados : DooPlay(
@@ -31,6 +32,16 @@ class Simpsonizados : DooPlay(
 
     override fun popularAnimeNextPageSelector() =
         "div.resppages > a > span.fa-chevron-right"
+
+    override fun animeDetailsParse(document: org.jsoup.nodes.Document): SAnime {
+        return SAnime.create().apply {
+            setUrlWithoutDomain(document.location())
+            thumbnail_url = document.selectFirst("div.poster img")?.getImageUrl()
+            title = document.selectFirst("div.data > h1, h1.title")?.text() ?: ""
+            description = document.selectFirst("div.wp-content p, div#info p")?.text()
+            genre = document.select("div.sgeneros a").eachText().joinToString()
+        }
+    }
 
     // La estructura del sitio es:
     // div con número de season > ul > li > a (episodio)

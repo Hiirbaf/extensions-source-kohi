@@ -43,6 +43,25 @@ class Simpsonizados : DooPlay(
     // ======== Episodes ========
     override fun episodeListParse(response: Response): List<SEpisode> {
         val doc = response.asJsoup()
+        val url = response.request.url.toString()
+
+        // Si es una página de capítulo individual (/cap/), devolver solo ese episodio
+        if (url.contains("/cap/")) {
+            val numerando = doc.selectFirst("div.numerando")?.text()?.trim() ?: ""
+            val (seasonNum, epNum) = numerando.split(" - ").map { it.trim() }.let {
+                if (it.size >= 2) it[0] to it[1] else "?" to "?"
+            }
+            val title = doc.selectFirst("div.data > h2, h2.title")?.text() ?: ""
+            return listOf(
+                SEpisode.create().apply {
+                    setUrlWithoutDomain(url)
+                    name = "$episodeSeasonPrefix $seasonNum x $epNum - $title"
+                    episode_number = epNum.toFloatOrNull() ?: 0F
+                    date_upload = doc.selectFirst("span.date")?.text()?.toDate() ?: 0L
+                },
+            )
+        }
+
         val seasons = doc.select(seasonListSelector)
         return if (seasons.isEmpty()) {
             listOf(

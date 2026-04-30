@@ -135,18 +135,13 @@ class Simpsonizados : DooPlay(
             client.newCall(POST("https://videok.pro/dl", postHeaders, postBody))
                 .execute().body.string()
         }.getOrElse {
-            android.util.Log.e("Simpsonizados", "Error POST /dl", it)
             return emptyList()
         }
-
-        android.util.Log.e("Simpsonizados", "POST response snippet: ${html.take(300)}")
 
         val masterUrl = html
             .substringAfter("sources: [{src: \"")
             .substringBefore("\"")
             .takeIf { it.contains("m3u8") }
-
-        android.util.Log.e("Simpsonizados", "Master URL: $masterUrl")
 
         if (masterUrl == null) return emptyList()
 
@@ -155,25 +150,30 @@ class Simpsonizados : DooPlay(
             .build()
 
         val masterPlaylist = client.newCall(GET(masterUrl, masterHeaders)).execute().body.string()
-        val baseM3u8Url = masterUrl.substringBeforeLast("/")
 
-        val qualities = mapOf("360" to "360p", "480" to "480p", "720" to "720p", "1080" to "1080p")
         val videos = mutableListOf<Video>()
+        val lines = masterPlaylist.lines()
 
-        masterPlaylist.lines().forEachIndexed { i, line ->
-            if (line.contains("RESOLUTION") || line.contains("BANDWIDTH")) {
-                val quality = qualities.entries
-                    .firstOrNull { masterPlaylist.lines().getOrNull(i + 1)?.contains(it.key) == true }
-                    ?.value ?: "Video"
-                val videoUrl = masterPlaylist.lines().getOrNull(i + 1)
-                    ?.let { if (it.startsWith("http")) it else "$baseM3u8Url/$it" }
-                    ?: return@forEachIndexed
-                videos.add(Video(videoUrl, "$label - $quality", videoUrl, masterHeaders))
+        lines.forEachIndexed { i, line ->
+            if (!line.startsWith("#EXT-X-STREAM-INF")) return@forEachIndexed
+            if (line.contains("I-FRAME")) return@forEachIndexed
+
+            val resolution = Regex("RESOLUTION=(\\d+x\\d+)").find(line)?.groupValues?.get(1) ?: ""
+            val height = resolution.substringAfter("x").toIntOrNull() ?: 0
+            val quality = when {
+                height >= 1080 -> "1080p"
+                height >= 720 -> "720p"
+                height >= 480 -> "480p"
+                height > 0 -> "360p"
+                else -> "Video"
             }
+
+            val videoUrl = lines.getOrNull(i + 1)
+                ?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+                ?.let { if (it.startsWith("http")) it else "${masterUrl.substringBeforeLast("/")}/$it" }
+                ?: return@forEachIndexed
+
+            videos.add(Video(videoUrl, "$label - $quality", videoUrl, masterHeaders))
         }
-
-        android.util.Log.e("Simpsonizados", "Videos found: ${videos.size}")
-
-        return videos.ifEmpty { listOf(Video(masterUrl, label, masterUrl, masterHeaders)) }
     }
 }

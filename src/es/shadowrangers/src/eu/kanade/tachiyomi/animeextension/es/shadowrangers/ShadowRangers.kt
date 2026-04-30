@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.lib.mp4uploadextractor.Mp4uploadExtractor
 import eu.kanade.tachiyomi.lib.streamwishextractor.StreamWishExtractor
 import eu.kanade.tachiyomi.lib.universalextractor.UniversalExtractor
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.Request
 import okhttp3.Response
@@ -107,12 +108,12 @@ class ShadowRangers : AnimeHttpSource() {
         doc.select("ul.episodios li, #episodios li").forEach { li ->
             val anchor = li.selectFirst("a") ?: return@forEach
             val epNum = li.selectFirst(".NumEp")?.text()?.trim()
-            val name = li.selectFirst(".Title")?.text()?.trim() ?: epNum ?: ""
+            val epName = li.selectFirst(".Title")?.text()?.trim() ?: epNum ?: ""
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
                     episode_number = epNum?.toFloatOrNull() ?: 0f
-                    name = name
+                    name = epName
                     date_upload = 0L
                 },
             )

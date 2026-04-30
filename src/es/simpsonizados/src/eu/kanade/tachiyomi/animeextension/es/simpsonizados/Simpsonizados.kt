@@ -119,21 +119,32 @@ class Simpsonizados : DooPlay(
             .add("Referer", baseUrl)
             .build()
 
-        val html = client.newCall(GET(embedUrl, embedHeaders)).execute().body.string()
+        val html = runCatching {
+            client.newCall(GET(embedUrl, embedHeaders)).execute().body.string()
+        }.getOrElse {
+            android.util.Log.e("Simpsonizados", "Error fetching embed: $embedUrl", it)
+            return emptyList()
+        }
+
+        android.util.Log.e("Simpsonizados", "Embed HTML snippet: ${html.take(500)}")
 
         val masterUrl = html
             .substringAfter("sources: [{src: \"")
             .substringBefore("\"")
             .takeIf { it.contains("m3u8") }
-            ?: return emptyList()
 
-        // Parsear calidades del master m3u8
+        android.util.Log.e("Simpsonizados", "Master URL: $masterUrl")
+
+        if (masterUrl == null) return emptyList()
+
         val masterHeaders = headers.newBuilder()
             .add("Referer", "https://videok.pro/")
             .build()
 
         val masterPlaylist = client.newCall(GET(masterUrl, masterHeaders)).execute().body.string()
-        val baseUrl = masterUrl.substringBeforeLast("/")
+        val baseM3u8Url = masterUrl.substringBeforeLast("/")
+
+        android.util.Log.e("Simpsonizados", "Master playlist: ${masterPlaylist.take(300)}")
 
         val qualities = mapOf(
             "360" to "360p",
@@ -149,11 +160,13 @@ class Simpsonizados : DooPlay(
                     .firstOrNull { masterPlaylist.lines().getOrNull(i + 1)?.contains(it.key) == true }
                     ?.value ?: "Video"
                 val videoUrl = masterPlaylist.lines().getOrNull(i + 1)
-                    ?.let { if (it.startsWith("http")) it else "$baseUrl/$it" }
+                    ?.let { if (it.startsWith("http")) it else "$baseM3u8Url/$it" }
                     ?: return@forEachIndexed
                 videos.add(Video(videoUrl, "$label - $quality", videoUrl, masterHeaders))
             }
         }
+
+        android.util.Log.e("Simpsonizados", "Videos found: ${videos.size}")
 
         return videos.ifEmpty {
             listOf(Video(masterUrl, label, masterUrl, masterHeaders))

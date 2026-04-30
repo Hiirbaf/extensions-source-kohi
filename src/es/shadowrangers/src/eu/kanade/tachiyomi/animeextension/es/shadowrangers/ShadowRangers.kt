@@ -105,7 +105,6 @@ class ShadowRangers : AnimeHttpSource() {
             val epNumText = li.selectFirst("div.numerando")?.text()?.trim() // "1 - 1"
             val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
             val epName = anchor.text().trim()
-            val dateUpload = li.selectFirst("span.date")?.text()
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
@@ -193,10 +192,9 @@ class ShadowRangers : AnimeHttpSource() {
             when {
                 "vkvideo.ru" in url || "vk.com" in url ->
                     VkExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
-                "voe.sx" in url || "voe-network" in url ->
-                    VoeExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
                 else ->
-                    emptyList()
+                    // Voe uses many rotating domains, try it for any unknown embed
+                    VoeExtractor(client, headers).videosFromUrl(url, prefix = "$serverName - ")
             }
         }.getOrDefault(emptyList())
     }

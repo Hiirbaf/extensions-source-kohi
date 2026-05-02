@@ -91,7 +91,7 @@ class MiSitio : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
             categoryFilter != null && categoryFilter.state != 0 -> {
                 val slug = categorySlugs[categoryFilter.state]
                 val pageParam = if (page > 1) "&cpg_page=$page" else ""
-                GET("$baseUrl/?category=$slug$pageParam", headers)
+                GET("$baseUrl/category/$slug/?$pageParam", headers)
             }
             else -> popularAnimeRequest(page)
         }

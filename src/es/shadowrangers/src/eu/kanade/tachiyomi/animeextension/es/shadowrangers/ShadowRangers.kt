@@ -75,7 +75,12 @@ class ShadowRangers : AnimeHttpSource() {
         }
     }
 
-    override fun searchAnimeParse(response: Response) = popularAnimeParse(response)
+    override fun searchAnimeParse(response: Response): AnimesPage {
+        val document = response.asJsoup()
+        val animes = document.select("div.result-item article").map { parseAnimeFromSearchResult(it) }
+        val hasNextPage = document.selectFirst("a.next.page-numbers") != null
+        return AnimesPage(animes, hasNextPage)
+    }
 
     // ============================== Details ===============================
 
@@ -105,6 +110,7 @@ class ShadowRangers : AnimeHttpSource() {
             val epNumText = li.selectFirst("div.numerando")?.text()?.trim() // "1 - 1"
             val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
             val epName = anchor.text().trim()
+            val dateUpload = li.selectFirst("span.date")?.text()
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
@@ -207,6 +213,15 @@ class ShadowRangers : AnimeHttpSource() {
             setUrlWithoutDomain(anchor.attr("href"))
             title = element.selectFirst("h3 a")?.text() ?: ""
             thumbnail_url = element.selectFirst("div.poster img")?.attr("abs:src")
+        }
+    }
+
+    private fun parseAnimeFromSearchResult(element: Element): SAnime {
+        return SAnime.create().apply {
+            val anchor = element.selectFirst("div.thumbnail a, div.image a")!!
+            setUrlWithoutDomain(anchor.attr("href"))
+            title = element.selectFirst("div.title a")?.text() ?: ""
+            thumbnail_url = element.selectFirst("img")?.attr("abs:src")
         }
     }
 

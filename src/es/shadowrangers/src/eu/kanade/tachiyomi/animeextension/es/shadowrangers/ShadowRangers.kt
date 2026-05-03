@@ -62,6 +62,7 @@ class ShadowRangers : AnimeHttpSource() {
         val typeFilter = filters.filterIsInstance<TypeFilter>().firstOrNull()
 
         return when {
+            query.isNotBlank() -> GET("$baseUrl/?s=$query&page=$page", headers)
             genreFilter?.state != 0 -> {
                 val genre = genreFilter!!.toUriPart()
                 GET("$baseUrl/genero/$genre/page/$page/", headers)
@@ -70,7 +71,6 @@ class ShadowRangers : AnimeHttpSource() {
                 val type = typeFilter!!.toUriPart()
                 GET("$baseUrl/$type/page/$page/", headers)
             }
-            query.isNotBlank() -> GET("$baseUrl/?s=$query&page=$page", headers)
             else -> popularAnimeRequest(page)
         }
     }

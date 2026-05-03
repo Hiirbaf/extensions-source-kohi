@@ -77,7 +77,12 @@ class ShadowRangers : AnimeHttpSource() {
 
     override fun searchAnimeParse(response: Response): AnimesPage {
         val document = response.asJsoup()
-        val animes = document.select("div.result-item article").map { parseAnimeFromSearchResult(it) }
+        // Search results use div.result-item, genre/type filters use article.item like popular
+        val animes = if (document.selectFirst("div.result-item") != null) {
+            document.select("div.result-item article").map { parseAnimeFromSearchResult(it) }
+        } else {
+            document.select("article.item.tvshows, article.item.movies").map { parseAnimeFromElement(it) }
+        }
         val hasNextPage = document.selectFirst("a.next.page-numbers") != null
         return AnimesPage(animes, hasNextPage)
     }

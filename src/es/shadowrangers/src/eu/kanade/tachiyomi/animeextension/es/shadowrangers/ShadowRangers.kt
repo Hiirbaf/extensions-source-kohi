@@ -16,6 +16,8 @@ import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Element
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class ShadowRangers : AnimeHttpSource() {
 
@@ -109,18 +111,23 @@ class ShadowRangers : AnimeHttpSource() {
     override fun episodeListParse(response: Response): List<SEpisode> {
         val doc = response.asJsoup()
         val episodes = mutableListOf<SEpisode>()
+        val dateFormat = SimpleDateFormat("MMM. dd, yyyy", Locale.ENGLISH)
 
         doc.select("#episodes ul.episodios li").forEach { li ->
             val anchor = li.selectFirst("div.episodiotitle a") ?: return@forEach
             val epNumText = li.selectFirst("div.numerando")?.text()?.trim() // "1 - 1"
             val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
             val epName = anchor.text().trim()
-            val dateUpload = li.selectFirst("span.date")?.text()
+            val dateText = li.selectFirst("div.episodiotitle span.date")?.text()?.trim()
+            val date = dateText?.let {
+                runCatching { dateFormat.parse(it)?.time ?: 0L }.getOrDefault(0L)
+            } ?: 0L
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
                     name = epName
                     episode_number = epNum
+                    date_upload = date
                 },
             )
         }

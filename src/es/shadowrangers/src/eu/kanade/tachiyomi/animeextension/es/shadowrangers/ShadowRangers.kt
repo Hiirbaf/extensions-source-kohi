@@ -116,8 +116,10 @@ class ShadowRangers : AnimeHttpSource() {
         doc.select("#episodes ul.episodios li").forEach { li ->
             val anchor = li.selectFirst("div.episodiotitle a") ?: return@forEach
             val epNumText = li.selectFirst("div.numerando")?.text()?.trim() // "1 - 1"
+            val seasonNum = epNumText?.split("-")?.getOrNull(0)?.trim() ?: "1"
             val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
             val epName = anchor.text().trim()
+            val epNameWithNum = "T$seasonNum-E${epNum.toInt()}: $epName"
             val dateText = li.selectFirst("div.episodiotitle span.date")?.text()?.trim()
             val date = dateText?.let {
                 runCatching { dateFormat.parse(it)?.time ?: 0L }.getOrDefault(0L)
@@ -125,7 +127,7 @@ class ShadowRangers : AnimeHttpSource() {
             episodes.add(
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anchor.attr("href"))
-                    name = epName
+                    name = epNameWithNum
                     episode_number = epNum
                     date_upload = date
                 },

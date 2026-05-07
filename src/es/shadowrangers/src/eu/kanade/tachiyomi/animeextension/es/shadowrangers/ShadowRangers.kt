@@ -96,7 +96,7 @@ class ShadowRangers : AnimeHttpSource() {
         return SAnime.create().apply {
             title = doc.selectFirst("h1.Title")?.text() ?: ""
             thumbnail_url = doc.selectFirst(".TPostBg, img.Bg, img[itemprop=image]")?.attr("abs:src")
-            description = doc.selectFirst("div.wp-content p, div.Description p, div[itemprop=description]")?.text()
+            description = doc.selectFirst("div.wp-content p, div.wp-content, div.Description p, div[itemprop=description]")?.text()
             genre = doc.select("p.genres a, .genres a").joinToString { it.text() }
             status = when (doc.selectFirst(".Status")?.text()?.lowercase()) {
                 "en emisión", "en emision" -> SAnime.ONGOING

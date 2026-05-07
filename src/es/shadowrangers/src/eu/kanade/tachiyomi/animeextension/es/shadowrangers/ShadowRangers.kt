@@ -96,7 +96,7 @@ class ShadowRangers : AnimeHttpSource() {
         return SAnime.create().apply {
             title = doc.selectFirst("h1.Title")?.text() ?: ""
             thumbnail_url = doc.selectFirst(".TPostBg, img.Bg, img[itemprop=image]")?.attr("abs:src")
-            description = doc.selectFirst("div.Description p, div[itemprop=description]")?.text()
+            description = doc.selectFirst("div.wp-content p, div.Description p, div[itemprop=description]")?.text()
             genre = doc.select("p.genres a, .genres a").joinToString { it.text() }
             status = when (doc.selectFirst(".Status")?.text()?.lowercase()) {
                 "en emisión", "en emision" -> SAnime.ONGOING
@@ -119,7 +119,7 @@ class ShadowRangers : AnimeHttpSource() {
             val seasonNum = epNumText?.split("-")?.getOrNull(0)?.trim() ?: "1"
             val epNum = epNumText?.split("-")?.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
             val epName = anchor.text().trim()
-            val epNameWithNum = "T$seasonNum-E${epNum.toInt()}: $epName"
+            val epNameWithNum = "T$seasonNum - E${epNum.toInt()}: $epName"
             val dateText = li.selectFirst("div.episodiotitle span.date")?.text()?.trim()
             val date = dateText?.let {
                 runCatching { dateFormat.parse(it)?.time ?: 0L }.getOrDefault(0L)

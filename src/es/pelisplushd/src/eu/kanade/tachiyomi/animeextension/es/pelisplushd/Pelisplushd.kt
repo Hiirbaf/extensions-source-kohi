@@ -31,10 +31,13 @@ import eu.kanade.tachiyomi.lib.vidhideextractor.VidHideExtractor
 import eu.kanade.tachiyomi.lib.voeextractor.VoeExtractor
 import eu.kanade.tachiyomi.lib.youruploadextractor.YourUploadExtractor
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
@@ -121,57 +124,77 @@ open class Pelisplushd(override val name: String, override val baseUrl: String) 
         val videoList = mutableListOf<Video>()
         val data = document.selectFirst("script:containsData(video[1] = )")?.data() ?: return emptyList()
 
-        REGEX_VIDEO_OPTS.findAll(data).map { it.groupValues[1] }.forEach { opt ->
-            val apiResponse = client.newCall(GET(opt)).execute()
-            if (apiResponse.isSuccessful) {
-                val docResponse = apiResponse.asJsoup()
-                val cryptoScript = docResponse.selectFirst("script:containsData(const dataLink)")?.data()
-                if (!cryptoScript.isNullOrBlank()) {
-                    val jsLinksMatch = cryptoScript.substringAfter("const dataLink =").substringBefore("];") + "]"
-                    val decryptUtf8 = cryptoScript.contains("decryptLink(encrypted){")
-                    var key = cryptoScript.substringAfter("CryptoJS.AES.decrypt(encrypted, '").substringBefore("')")
-                    if (!decryptUtf8) {
-                        key = cryptoScript.substringAfter("decryptLink(server.link, '").substringBefore("'),")
-                    }
-                    json.decodeFromString<List<DataLinkDto>>(jsLinksMatch).flatMap { embed ->
-                        embed.sortedEmbeds.map { item ->
-                            val link = CryptoAES.decryptCbcIV(item?.link ?: "", key, decryptUtf8) ?: ""
-                            val lng = embed.videoLanguage ?: ""
-                            val server = item?.servername ?: ""
-                            (server to lng) to link
-                        }
-                    }.flatMap {
-                        runCatching {
-                            val url = it.third.substringAfter("go_to_player('")
-                                .substringAfter("go_to_playerVast('")
-                                .substringBefore("?cover_url=")
-                                .substringBefore("')")
-                                .substringBefore("',")
-                                .substringBefore("?poster")
-                                .substringBefore("?c_poster=")
-                                .substringBefore("?thumb=")
-                                .substringBefore("#poster=")
+        REGEX_VIDEO_OPTS.findAll(data).map { it.groupValues[1] }.forEach { embedUrl ->
+            runCatching {
+                val embedDoc = client.newCall(GET(embedUrl)).execute().asJsoup()
 
-                            val realUrl = if (!REGEX_LINK.containsMatchIn(url)) {
+                // El sitio ahora usa "dataLink" sin "const"
+                val jsonString = embedDoc
+                    .selectFirst("script:containsData(dataLink)")
+                    ?.data()
+                    ?.substringAfter("dataLink = ")
+                    ?.substringBefore(";")
+                    ?: return@runCatching
+
+                val dataLinks = json.decodeFromString<List<DataLinkDto>>(jsonString)
+
+                dataLinks.forEach { langBlock ->
+                    val language = langBlock.videoLanguage ?: ""
+                    val encryptedLinks = langBlock.sortedEmbeds
+                        .mapNotNull { it?.link }
+                        .filter { it.isNotBlank() }
+
+                    if (encryptedLinks.isEmpty()) return@forEach
+
+                    // POST a embed69.org/api/decrypt para desencriptar los links
+                    val linksJson = encryptedLinks.joinToString(",") { "\"$it\"" }
+                    val body = """{"links":[$linksJson]}"""
+                        .toRequestBody("application/json; charset=utf-8".toMediaType())
+
+                    val decryptResponse = runCatching {
+                        client.newCall(
+                            POST("https://embed69.org/api/decrypt", headers, body),
+                        ).execute()
+                    }.getOrNull() ?: return@forEach
+
+                    if (!decryptResponse.isSuccessful) return@forEach
+
+                    val decryptedJson = decryptResponse.body.string()
+                    // Respuesta: {"success":true,"links":[{"index":0,"link":"https://..."}]}
+                    val linkMatches = Regex(""""link"\s*:\s*"([^"]+)"""")
+                        .findAll(decryptedJson)
+                        .map { it.groupValues[1].replace("\\/", "/") }
+                        .toList()
+
+                    linkMatches.forEach { rawUrl ->
+                        val url = rawUrl
+                            .substringAfter("go_to_player('")
+                            .substringAfter("go_to_playerVast('")
+                            .substringBefore("?cover_url=")
+                            .substringBefore("')")
+                            .substringBefore("',")
+                            .substringBefore("?poster")
+                            .substringBefore("?c_poster=")
+                            .substringBefore("?thumb=")
+                            .substringBefore("#poster=")
+
+                        val realUrl = when {
+                            !REGEX_LINK.containsMatchIn(url) ->
                                 String(Base64.decode(url, Base64.DEFAULT))
-                            } else if (url.contains("?data=")) {
-                                val apiPageSoup = client.newCall(GET(url)).execute().asJsoup()
-                                apiPageSoup.selectFirst("iframe")?.attr("src") ?: ""
-                            } else {
-                                url
-                            }
-                            serverVideoResolver(realUrl, it.second, it.first)
-                        }.getOrNull() ?: emptyList()
-                    }.also(videoList::addAll)
-                } else {
-                    docResponse.select("li[onclick]")
-                        .flatMap { fetchUrls(it.attr("onclick")) }
-                        .forEach { realUrl ->
-                            serverVideoResolver(realUrl).also(videoList::addAll)
+                            url.contains("?data=") ->
+                                client.newCall(GET(url)).execute()
+                                    .asJsoup().selectFirst("iframe")?.attr("src") ?: ""
+                            else -> url
                         }
+
+                        if (realUrl.isNotBlank()) {
+                            serverVideoResolver(realUrl, language, "").also(videoList::addAll)
+                        }
+                    }
                 }
             }
         }
+
         return videoList.sort()
     }
 
